@@ -10,6 +10,7 @@ import AdminPanel from './components/AdminPanel';
 import ImportExcelModal from './components/ImportExcelModal';
 import BienDongReportModal from './components/BienDongReportModal';
 import OnlineSpreadsheetModal from './components/OnlineSpreadsheetModal';
+import NiemYetBoard from './components/NiemYetBoard';
 import { getProcedureTrangThai } from './utils/bienDongHelper';
 import { fetchOnlineSpreadsheet, parseSpreadsheetBuffer } from './utils/onlineExcelSync';
 import { fetchServerData, syncDataToServer, resetServerData } from './services/apiSync';
@@ -36,11 +37,22 @@ import {
   RefreshCw,
   FileBarChart2,
   TrendingUp,
-  FileSpreadsheet
+  FileSpreadsheet,
+  LayoutGrid
 } from 'lucide-react';
 
 export default function App() {
   // --- STATE ---
+  const [activeMainTab, setActiveMainTab] = useState<'niemyet' | 'quanly'>(() => {
+    const saved = localStorage.getItem('tthc_active_main_tab');
+    return (saved === 'quanly' || saved === 'niemyet') ? saved : 'niemyet';
+  });
+
+  const handleSelectMainTab = (tab: 'niemyet' | 'quanly') => {
+    setActiveMainTab(tab);
+    localStorage.setItem('tthc_active_main_tab', tab);
+  };
+
   const [procedures, setProcedures] = useState<Procedure[]>([]);
   const [isSyncingOnline, setIsSyncingOnline] = useState(false);
   const [isBienDongModalOpen, setIsBienDongModalOpen] = useState(false);
@@ -940,40 +952,103 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col justify-between">
       
-      {/* 1. Portal Header */}
-      <Header 
-        totalCount={procedures.length} 
-        settings={settings} 
-        isServerSyncing={isServerSyncing}
-        serverStatus={serverSyncStatus}
-        onRefreshServer={() => loadDataFromServer(true)}
-        lastSyncTime={serverLastUpdated}
-      />
-
-      {/* 2. Main Dashboard Container */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-6">
-        
-        {/* Toast Toast Alert simulation */}
-        {toast && (
-          <div className={`fixed bottom-5 right-5 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-xl text-white font-semibold text-xs border animate-slideIn ${
-            toast.type === 'success' 
-              ? 'bg-emerald-600 border-emerald-500' 
-              : toast.type === 'error' 
-                ? 'bg-red-700 border-red-600 animate-shake' 
-                : 'bg-slate-800 border-slate-700'
-          }`} id="global-alert-toast">
-            <span className="bg-white/20 p-1 rounded-md">
-              <Check className="w-4 h-4" />
-            </span>
-            <span>{toast.message}</span>
-            <button 
-              onClick={() => setToast(null)}
-              className="ml-3 hover:text-slate-200 text-[10px] uppercase font-bold"
+      {/* 0. Top Navigation Tab Switcher */}
+      <div className="bg-slate-900 text-white border-b border-slate-800 px-4 py-2 select-none shrink-0 print:hidden z-30">
+        <div className="max-w-[1700px] mx-auto flex items-center justify-between gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <button
+              onClick={() => handleSelectMainTab('niemyet')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                activeMainTab === 'niemyet'
+                  ? 'bg-[#c51f24] text-white shadow-sm ring-1 ring-white/30'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+              }`}
+              id="tab-nav-niemyet"
             >
-              Đóng
+              <LayoutGrid className="w-3.5 h-3.5 text-amber-300" />
+              <span>BẢNG NIÊM YẾT TTHC (KIOSK)</span>
+            </button>
+
+            <button
+              onClick={() => handleSelectMainTab('quanly')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                activeMainTab === 'quanly'
+                  ? 'bg-[#c51f24] text-white shadow-sm ring-1 ring-white/30'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+              }`}
+              id="tab-nav-quanly"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+              <span>QUẢN TRỊ & TRA CỨU DỮ LIỆU</span>
+              <span className="bg-amber-400 text-red-950 px-1.5 py-0.2 rounded font-mono text-[10px] font-black">
+                {procedures.length} TTHC
+              </span>
             </button>
           </div>
-        )}
+
+          <div className="flex items-center gap-2 text-xs">
+            <button
+              type="button"
+              onClick={() => setIsOnlineSpreadsheetOpen(true)}
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1 bg-emerald-700/90 hover:bg-emerald-600 text-emerald-100 rounded-md text-xs font-semibold cursor-pointer border border-emerald-600 transition-colors"
+              title="Mở biểu mẫu đồng bộ 2 chiều với Google Sheets / Excel Online"
+            >
+              <Globe className="w-3.5 h-3.5 text-emerald-300" />
+              <span>Biểu mẫu Online (2 chiều)</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Toast Alert popup (Available across all tabs) */}
+      {toast && (
+        <div className={`fixed bottom-5 right-5 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-xl text-white font-semibold text-xs border animate-slideIn ${
+          toast.type === 'success' 
+            ? 'bg-emerald-600 border-emerald-500' 
+            : toast.type === 'error' 
+              ? 'bg-red-700 border-red-600 animate-shake' 
+              : 'bg-slate-800 border-slate-700'
+        }`} id="global-alert-toast">
+          <span className="bg-white/20 p-1 rounded-md">
+            <Check className="w-4 h-4" />
+          </span>
+          <span>{toast.message}</span>
+          <button 
+            onClick={() => setToast(null)}
+            className="ml-3 hover:text-slate-200 text-[10px] uppercase font-bold cursor-pointer"
+          >
+            Đóng
+          </button>
+        </div>
+      )}
+
+      {/* Main Tab Render */}
+      {activeMainTab === 'niemyet' ? (
+        /* Tab 1: Kiosk Administrative Procedure Listing */
+        <NiemYetBoard
+          procedures={procedures}
+          settings={settings}
+          onViewProcedureDetail={(procedure) => {
+            setEditingProcedure(procedure);
+            setIsModalOpen(true);
+          }}
+          onOpenManagementTab={() => handleSelectMainTab('quanly')}
+        />
+      ) : (
+        /* Tab 2: Full Data Management Dashboard */
+        <>
+          {/* 1. Portal Header */}
+          <Header 
+            totalCount={procedures.length} 
+            settings={settings} 
+            isServerSyncing={isServerSyncing}
+            serverStatus={serverSyncStatus}
+            onRefreshServer={() => loadDataFromServer(true)}
+            lastSyncTime={serverLastUpdated}
+          />
+
+          {/* 2. Main Dashboard Container */}
+          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-6">
 
         {/* Dynamic Bento KPI stats layout */}
         <StatsDashboard 
@@ -1727,6 +1802,8 @@ export default function App() {
           </p>
         </div>
       </footer>
+    </>
+  )}
 
       {/* 6. Form Adding/Editing Modal Drawer */}
       <ProcedureModal

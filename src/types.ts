@@ -56,4 +56,32 @@ export interface OnlineExcelSyncResult {
   sourceUrl: string;
 }
 
+export interface NiemYetConfig {
+  groupBy: 'linhVuc' | 'soNganh' | 'capThucHien' | 'dvctt';
+  columns: 3 | 4 | 5 | 6 | 'auto';
+  colorTheme: 'red' | 'burgundy' | 'blue' | 'emerald';
+  sortBy: 'count_desc' | 'name_asc' | 'original';
+  cardsPerPage: number;
+  showDepartment: boolean;
+  showCountBadge: boolean;
+  hideEmpty: boolean;
+  displayTitle: string;
+  subTitle: string;
+  autoSlideInterval: number; // 0 = off, 10, 15, 30s
+}
+
+export const DEFAULT_NIEM_YET_CONFIG: NiemYetConfig = {
+  groupBy: 'linhVuc',
+  columns: 6,
+  colorTheme: 'red',
+  sortBy: 'count_desc',
+  cardsPerPage: 12,
+  showDepartment: true,
+  showCountBadge: true,
+  hideEmpty: true,
+  displayTitle: 'BẢNG NIÊM YẾT THỦ TỤC HÀNH CHÍNH',
+  subTitle: 'TRUNG TÂM PHỤC VỤ HÀNH CHÍNH CÔNG XÃ BA CHẼ',
+  autoSlideInterval: 0,
+};
+
 
