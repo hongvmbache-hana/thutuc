@@ -1,0 +1,8 @@
+{
+  "name": "Remix Quản lý Thủ tục Hành chính 2",
+  "description": "Hệ thống quản lý, phân loại, tìm kiếm nâng cao và xuất báo cáo các thủ hành chính nhanh chóng, hiệu quả.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
