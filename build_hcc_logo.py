@@ -1,0 +1,90 @@
+import math
+
+# Center
+CX = 200
+CY = 200
+
+# Colors from Logo HCC 3.png
+RED = "#B81C24"       # Deep rich official Vietnamese red
+YELLOW = "#F5CF63"    # Warm golden yellow
+DARK_RED = "#981219"
+
+# Let us construct the hand vector path with high precision.
+# To ensure mathematical perfection of the 5-fold radial symmetry and central star:
+# We will define the master hand, its 4 fingers with 3 slots, and the golden cuff accent.
+
+# Radius of star tip:
+R_STAR = 62.0
+
+# Star tip angles (deg): 
+# In Logo HCC 3.png, the star tip is at the inner corner.
+# Each hand provides:
+# 1. The inner palm edge that forms one side of a star point.
+# 2. The outer sweeping curve of the wrist that hugs the next hand.
+# 3. The 4 fingers pointing towards the next hand.
+
+svg = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+  <defs>
+    <!-- Master hand definition -->
+    <g id="hcc-single-hand">
+      <!-- Golden yellow cuff fold -->
+      <path
+        d="M 64 246 C 72 230 84 216 102 210 C 90 226 78 238 64 246 Z"
+        fill="{YELLOW}"
+      />
+
+      <!-- Red hand body: wrist, back of hand, 4 fingers, palm -->
+      <path
+        d="
+          M 64 246
+          C 46 220 28 175 40 130
+          C 48 94 76 76 112 76
+          L 185 76
+          C 190 76 192 79 192 83
+          L 192 90
+          C 192 94 190 96 185 96
+          L 108 96
+          C 102 96 99 99 99 102
+          C 99 105 102 108 108 108
+          L 175 108
+          C 180 108 182 111 182 115
+          L 182 122
+          C 182 126 180 128 175 128
+          L 108 128
+          C 102 128 99 131 99 134
+          C 99 137 102 140 108 140
+          L 162 140
+          C 167 140 169 143 169 147
+          L 169 154
+          C 169 158 167 160 162 160
+          L 108 160
+          C 102 160 99 163 99 166
+          C 99 169 102 172 108 172
+          L 148 172
+          C 153 172 155 175 155 179
+          L 155 186
+          C 155 190 153 192 148 192
+          L 116 192
+          C 106 192 98 200 102 210
+          C 86 222 74 236 64 246
+          Z
+        "
+        fill="{RED}"
+      />
+    </g>
+  </defs>
+
+  <!-- 5 hands rotated by 72 deg around center (200, 200) -->
+  <g id="hcc-emblem">
+    <use href="#hcc-single-hand" />
+    <use href="#hcc-single-hand" transform="rotate(72 200 200)" />
+    <use href="#hcc-single-hand" transform="rotate(144 200 200)" />
+    <use href="#hcc-single-hand" transform="rotate(216 200 200)" />
+    <use href="#hcc-single-hand" transform="rotate(288 200 200)" />
+  </g>
+</svg>"""
+
+with open("public/logo-hcc.svg", "w") as f:
+    f.write(svg)
+
+print("Updated public/logo-hcc.svg successfully")

@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { Procedure, AppSettings, NiemYetConfig, DEFAULT_NIEM_YET_CONFIG } from '../types';
+import HanhChinhCongLogo from './HanhChinhCongLogo';
 
 interface NiemYetBoardProps {
   procedures: Procedure[];
@@ -120,7 +121,12 @@ export default function NiemYetBoard({
     const saved = localStorage.getItem('tthc_niemyet_config');
     if (saved) {
       try {
-        return { ...DEFAULT_NIEM_YET_CONFIG, ...JSON.parse(saved) };
+        const parsed = JSON.parse(saved);
+        return { 
+          ...DEFAULT_NIEM_YET_CONFIG, 
+          ...parsed,
+          cardShape: parsed.cardShape === 'elongated' ? 'a4' : (parsed.cardShape || 'a4')
+        };
       } catch (e) {
         return DEFAULT_NIEM_YET_CONFIG;
       }
@@ -384,20 +390,22 @@ export default function NiemYetBoard({
           
           {/* Left: Emblem & Titles */}
           <div className="flex items-center gap-3.5">
-            {/* National stylized Emblem icon */}
-            <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 shadow-sm border border-red-200 bg-red-50 relative overflow-hidden">
-              <div className="absolute inset-0 bg-radial from-red-600 to-red-800 opacity-95"></div>
-              {/* Stylized emblem hands & star */}
-              <svg className="w-8 h-8 text-amber-300 relative z-10" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2l2.4 7.2h7.6l-6.1 4.5 2.3 7.3-6.2-4.6-6.2 4.6 2.3-7.3-6.1-4.5h7.6z" />
-              </svg>
+            {/* Official Vietnam Public Administrative Service Logo */}
+            <div className="shrink-0 flex items-center justify-center">
+              <HanhChinhCongLogo size={52} className="hover:scale-105 transition-transform drop-shadow-md" />
             </div>
 
             <div>
-              <h1 className="text-lg sm:text-2xl font-black tracking-tight text-[#c51f24] uppercase leading-tight font-serif">
+              <h1 
+                className="text-lg sm:text-2xl md:text-[26px] font-bold tracking-tight text-[#c51f24] uppercase leading-tight font-times select-text"
+                style={{ fontFamily: '"Times New Roman", Times, "Tinos", serif' }}
+              >
                 {config.displayTitle || 'BẢNG NIÊM YẾT THỦ TỤC HÀNH CHÍNH'}
               </h1>
-              <p className="text-xs sm:text-sm font-black text-slate-800 uppercase tracking-wide mt-0.5">
+              <p 
+                className="text-xs sm:text-sm font-bold text-slate-800 uppercase tracking-wide mt-0.5 font-times select-text"
+                style={{ fontFamily: '"Times New Roman", Times, "Tinos", serif' }}
+              >
                 {config.subTitle || 'TRUNG TÂM PHỤC VỤ HÀNH CHÍNH CÔNG XÃ BA CHẼ'}
               </p>
             </div>
@@ -838,11 +846,12 @@ export default function NiemYetBoard({
           /* CASE B: Default Kiosk Grid (Exact representation as shown in uploaded photo!) */
           <div className="flex-1 flex flex-col justify-between space-y-4">
             
-            {/* The 12-Card Grid (2 rows x 6 cols as depicted in photo) */}
+            {/* The 12-Card Grid (A4 Portrait Sheet format or Compact horizontal) */}
             <div className={`grid ${getGridColsClass()} gap-3.5 sm:gap-4.5 flex-1 content-start`}>
               {pagedGroups.map((item, idx) => {
                 // Pad count with zero if < 10 (e.g. "01 TTHC", "09 TTHC", "12 TTHC")
                 const paddedCount = item.count < 10 ? `0${item.count}` : `${item.count}`;
+                const isA4 = config.cardShape === 'a4' || config.cardShape === 'standard' || !config.cardShape;
 
                 return (
                   <div
@@ -854,49 +863,81 @@ export default function NiemYetBoard({
                     className={`
                       ${theme.cardBg}
                       ${theme.cardBorder}
-                      text-white rounded-xl sm:rounded-2xl p-4 sm:p-5
+                      text-white rounded-xl sm:rounded-2xl
+                      ${isA4 
+                        ? 'p-4 sm:p-5 min-h-[225px] sm:min-h-[265px] md:min-h-[295px] lg:min-h-[320px] aspect-[1/1.38]' 
+                        : 'px-3.5 py-2.5 sm:px-4 sm:py-3 min-h-[96px] sm:min-h-[105px] lg:min-h-[114px]'}
                       flex flex-col justify-between
-                      shadow-md hover:shadow-xl hover:scale-[1.02]
+                      shadow-md hover:shadow-2xl hover:scale-[1.02]
                       border transition-all duration-200 cursor-pointer
                       relative overflow-hidden group select-none
-                      min-h-[160px] sm:min-h-[185px] lg:min-h-[210px]
                     `}
                     id={`kiosk-card-${idx}`}
                   >
-                    {/* Background subtle sheen effect */}
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl pointer-events-none group-hover:bg-white/10 transition-all"></div>
+                    {/* Top document edge accent for A4 sheet */}
+                    {isA4 && (
+                      <div className="absolute top-0 inset-x-0 h-1 bg-white/30 group-hover:bg-amber-300 transition-colors pointer-events-none"></div>
+                    )}
 
-                    {/* Top Row: Star emblem & Badge counter */}
-                    <div className="flex items-center justify-between gap-2 shrink-0">
-                      {/* Stylized Star Emblem on card */}
-                      <div className="w-7 h-7 rounded-full bg-white/20 border border-white/40 flex items-center justify-center">
-                        <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M12 2l2.4 7.2h7.6l-6.1 4.5 2.3 7.3-6.2-4.6-6.2 4.6 2.3-7.3-6.1-4.5h7.6z" />
-                        </svg>
+                    {/* Background subtle sheen & watermark effect */}
+                    <div className="absolute top-0 right-0 w-36 h-36 bg-white/5 rounded-full blur-2xl pointer-events-none group-hover:bg-white/10 transition-all"></div>
+
+                    {/* Top Row: Official Public Service Emblem (circular badge) & Badge counter */}
+                    <div className="flex items-center justify-between gap-2 shrink-0 relative z-10">
+                      {/* Logo mới theo Logo HCC 3 (đã bỏ chữ Hành chính công) */}
+                      <div className="shrink-0 flex items-center">
+                        <HanhChinhCongLogo 
+                          size={isA4 ? 32 : 22} 
+                          variant="badge" 
+                          className="hover:scale-105 transition-transform drop-shadow-sm" 
+                        />
                       </div>
 
                       {/* Badge counter: e.g. "01 TTHC", "36 TTHC" */}
                       {config.showCountBadge && (
-                        <span className={`px-2.5 py-0.5 rounded-full border ${theme.badgeBg} font-mono font-bold text-xs sm:text-xs tracking-wider uppercase shadow-xs`}>
+                        <span className={`px-2.5 py-0.5 rounded-full border ${theme.badgeBg} font-mono font-bold ${isA4 ? 'text-xs sm:text-xs' : 'text-[10.5px] sm:text-xs'} tracking-wider uppercase shadow-xs`}>
                           {paddedCount} TTHC
                         </span>
                       )}
                     </div>
 
-                    {/* Middle: Category Name in bold uppercase, centered */}
-                    <div className="my-auto py-2 text-center">
-                      <h3 className="text-sm sm:text-base lg:text-[16px] font-black uppercase tracking-tight text-white leading-snug drop-shadow-xs line-clamp-3">
+                    {/* Middle: Category Name in bold uppercase, centered (A4 Document layout) */}
+                    <div className={`${isA4 ? 'my-auto py-3 px-1' : 'my-auto py-1'} text-center relative z-10`}>
+                      {isA4 && (
+                        <span className="text-[10px] sm:text-[10.5px] font-bold text-white/70 uppercase tracking-widest block font-times mb-1.5 select-none">
+                          LĨNH VỰC THỦ TỤC
+                        </span>
+                      )}
+
+                      <h3 className={`${isA4 ? 'text-sm sm:text-base lg:text-[16px] xl:text-[17px]' : 'text-xs sm:text-[13px] lg:text-[13.5px]'} font-black uppercase tracking-tight text-white leading-snug drop-shadow-xs ${isA4 ? 'line-clamp-4' : 'line-clamp-2'}`}>
                         {item.name}
                       </h3>
+
+                      {isA4 && (
+                        <div className="mt-2.5 flex flex-col items-center">
+                          <div className="w-8 h-0.5 bg-amber-400/80 rounded-full mb-1"></div>
+                          <p className="text-[11px] text-white/85 font-medium font-times italic">
+                            {paddedCount} thủ tục niêm yết
+                          </p>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Bottom: Department with building icon */}
+                    {/* Bottom: Department with building icon & interactive cue */}
                     {config.showDepartment && (
-                      <div className="pt-2 border-t border-white/25 border-dashed flex items-center justify-center gap-1.5 text-center shrink-0">
-                        <Building2 className="w-3.5 h-3.5 text-white/80 shrink-0" />
-                        <span className="text-[10px] sm:text-[11px] font-extrabold uppercase text-white/95 tracking-wide truncate">
-                          {item.department}
-                        </span>
+                      <div className={`${isA4 ? 'pt-2.5 border-t border-white/25 border-dashed flex flex-col gap-1' : 'pt-1.5 border-t border-white/20 border-dashed flex items-center justify-center gap-1.5'} text-center shrink-0 relative z-10`}>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <Building2 className={`${isA4 ? 'w-3.5 h-3.5 text-amber-300' : 'w-3 h-3 text-white/80'} shrink-0`} />
+                          <span className={`${isA4 ? 'text-[10px] sm:text-[11px]' : 'text-[9.5px] sm:text-[10.5px]'} font-extrabold uppercase text-white/95 tracking-wide truncate`}>
+                            {item.department}
+                          </span>
+                        </div>
+                        {isA4 && (
+                          <div className="text-[9.5px] text-white/70 font-semibold tracking-wide flex items-center justify-center gap-1 group-hover:text-amber-200 transition-colors">
+                            <span>Chạm để tra cứu chi tiết</span>
+                            <span className="text-xs">→</span>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1211,6 +1252,37 @@ export default function NiemYetBoard({
                 </div>
               </div>
 
+              {/* Option 2b: Card Shape / Aspect Ratio */}
+              <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                <label className="font-bold text-slate-900 text-xs block">
+                  Kích thước & Hình dạng thẻ lĩnh vực:
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => saveConfig({ ...config, cardShape: 'a4' })}
+                    className={`py-2 px-3 rounded-lg border text-center font-bold text-xs cursor-pointer transition-all ${
+                      config.cardShape === 'a4' || config.cardShape === 'standard' || !config.cardShape
+                        ? 'bg-[#c51f24] text-white border-[#c51f24] shadow-xs'
+                        : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
+                    }`}
+                  >
+                    📄 Dạng tờ A4 đứng (Cao, kiểu tờ A4)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => saveConfig({ ...config, cardShape: 'elongated' })}
+                    className={`py-2 px-3 rounded-lg border text-center font-bold text-xs cursor-pointer transition-all ${
+                      config.cardShape === 'elongated'
+                        ? 'bg-[#c51f24] text-white border-[#c51f24] shadow-xs'
+                        : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
+                    }`}
+                  >
+                    📑 Dạng chữ nhật ngang (Thấp gọn)
+                  </button>
+                </div>
+              </div>
+
               {/* Option 3: Color theme of cards */}
               <div className="space-y-1.5 pt-2 border-t border-slate-100">
                 <label className="font-bold text-slate-900 text-xs block">
@@ -1273,14 +1345,28 @@ export default function NiemYetBoard({
                   5. Tùy chỉnh tiêu đề bảng niêm yết:
                 </label>
                 <div>
-                  <span className="text-[11px] text-slate-500 block mb-1">Dòng tiêu đề chính:</span>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[11px] text-slate-500">Dòng tiêu đề chính:</span>
+                    <button
+                      type="button"
+                      onClick={() => saveConfig({ ...config, displayTitle: 'BẢNG NIÊM YẾT THỦ TỤC HÀNH CHÍNH' })}
+                      className="text-[10px] text-red-600 font-bold hover:underline cursor-pointer"
+                    >
+                      Đặt lại tiêu đề chuẩn
+                    </button>
+                  </div>
                   <input
                     type="text"
                     value={config.displayTitle}
                     onChange={(e) => saveConfig({ ...config, displayTitle: e.target.value })}
-                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs"
+                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-bold text-red-700 font-times"
+                    style={{ fontFamily: '"Times New Roman", Times, "Tinos", serif' }}
                     placeholder="BẢNG NIÊM YẾT THỦ TỤC HÀNH CHÍNH"
                   />
+                  <div className="mt-1 text-[11px] text-slate-500 font-times italic flex items-center gap-1">
+                    <span>Xem trước font Times New Roman:</span>
+                    <span className="font-bold text-red-700 not-italic">{config.displayTitle || 'BẢNG NIÊM YẾT THỦ TỤC HÀNH CHÍNH'}</span>
+                  </div>
                 </div>
                 <div>
                   <span className="text-[11px] text-slate-500 block mb-1">Tên cơ quan / đơn vị niêm yết:</span>

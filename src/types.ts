@@ -68,6 +68,7 @@ export interface NiemYetConfig {
   displayTitle: string;
   subTitle: string;
   autoSlideInterval: number; // 0 = off, 10, 15, 30s
+  cardShape?: 'a4' | 'standard' | 'elongated';
 }
 
 export const DEFAULT_NIEM_YET_CONFIG: NiemYetConfig = {
@@ -82,6 +83,7 @@ export const DEFAULT_NIEM_YET_CONFIG: NiemYetConfig = {
   displayTitle: 'BẢNG NIÊM YẾT THỦ TỤC HÀNH CHÍNH',
   subTitle: 'TRUNG TÂM PHỤC VỤ HÀNH CHÍNH CÔNG XÃ BA CHẼ',
   autoSlideInterval: 0,
+  cardShape: 'a4',
 };
 
 
