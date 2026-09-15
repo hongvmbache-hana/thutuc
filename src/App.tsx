@@ -679,6 +679,7 @@ export default function App() {
 
   // Download raw database backup (JSON)
   const handleBackupDownload = () => {
+    if (!checkAdminPermission('Sao lưu dữ liệu TTHC (.json)', () => handleBackupDownload())) return;
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(procedures, null, 2));
     const dlAnchorElem = document.createElement('a');
     dlAnchorElem.setAttribute("href", dataStr);
@@ -1024,9 +1025,12 @@ export default function App() {
           <div className="flex items-center gap-2 text-xs">
             <button
               type="button"
-              onClick={() => setIsOnlineSpreadsheetOpen(true)}
+              onClick={() => {
+                if (!checkAdminPermission('Mở và điều chỉnh Biểu mẫu Online 2 chiều', () => setIsOnlineSpreadsheetOpen(true))) return;
+                setIsOnlineSpreadsheetOpen(true);
+              }}
               className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700/90 hover:bg-emerald-600 text-emerald-100 rounded-lg text-xs font-semibold cursor-pointer border border-emerald-600 transition-colors"
-              title="Mở biểu mẫu đồng bộ 2 chiều với Google Sheets / Excel Online"
+              title="Mở biểu mẫu đồng bộ 2 chiều với Google Sheets / Excel Online (Yêu cầu quyền Quản trị viên)"
             >
               <Globe className="w-3.5 h-3.5 text-emerald-300" />
               <span>Biểu mẫu Online</span>
@@ -1180,9 +1184,12 @@ export default function App() {
               {/* Reset Default */}
               <button
                 type="button"
-                onClick={handleResetToPresets}
+                onClick={() => {
+                  if (!checkAdminPermission('Khôi phục danh sách thủ tục mặc định ban đầu', () => handleResetToPresets())) return;
+                  handleResetToPresets();
+                }}
                 className="flex items-center gap-1 px-2.5 py-2 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-semibold border border-slate-200 bg-white transition-colors cursor-pointer"
-                title="Khôi phục 11 thủ tục gốc đề xuất ban đầu"
+                title="Khôi phục 11 thủ tục gốc đề xuất ban đầu (Yêu cầu quyền Quản trị viên)"
                 id="reset-to-origin-records"
               >
                 Mặc định
@@ -1192,9 +1199,12 @@ export default function App() {
               <div className="relative group/backup">
                 <button
                   type="button"
-                  onClick={handleBackupDownload}
+                  onClick={() => {
+                    if (!checkAdminPermission('Sao lưu dữ liệu TTHC (.json)', () => handleBackupDownload())) return;
+                    handleBackupDownload();
+                  }}
                   className="flex items-center gap-1.5 px-2.5 py-2 hover:bg-slate-200 text-indigo-700 rounded-lg text-xs font-semibold border border-slate-200 bg-white transition-colors cursor-pointer"
-                  title="Tải tệp JSON lưu trữ ngoại tuyến dữ liệu của bạn"
+                  title="Tải tệp JSON lưu trữ ngoại tuyến dữ liệu của bạn (Yêu cầu quyền Quản trị viên)"
                 >
                   <DatabaseBackup className="w-4 h-4" />
                   <span className="hidden md:inline">Sao lưu</span>
@@ -1202,21 +1212,28 @@ export default function App() {
               </div>
 
               {/* Loader backup input */}
-              <label 
+              <button
+                type="button"
+                onClick={() => {
+                  if (!checkAdminPermission('Nạp dữ liệu sao lưu TTHC (.json)', () => {
+                    document.getElementById('restore-file-input')?.click();
+                  })) return;
+                  document.getElementById('restore-file-input')?.click();
+                }}
                 className="flex items-center gap-1.5 px-2.5 py-2 hover:bg-indigo-50 border border-indigo-200 bg-indigo-50/20 text-indigo-700 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
-                title="Chọn tệp JSON đã lưu để nạp ngược lại vào trình duyệt"
-                htmlFor="restore-file-input"
+                title="Chọn tệp JSON đã lưu để nạp ngược lại vào hệ thống (Yêu cầu quyền Quản trị viên)"
+                id="restore-file-btn"
               >
                 <Upload className="w-4 h-4" />
                 <span className="hidden md:inline">Nạp dữ liệu</span>
-                <input
-                  type="file"
-                  id="restore-file-input"
-                  accept=".json"
-                  className="hidden"
-                  onChange={handleBackupUpload}
-                />
-              </label>
+              </button>
+              <input
+                type="file"
+                id="restore-file-input"
+                accept=".json"
+                className="hidden"
+                onChange={handleBackupUpload}
+              />
 
               {/* Export Button Wrapper */}
               <ExportButton procedures={sortedProcedures} settings={settings} />
@@ -1225,11 +1242,12 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => {
+                  if (!checkAdminPermission('Mở và điều chỉnh Biểu mẫu Online 2 chiều', () => setIsOnlineSpreadsheetOpen(true))) return;
                   setIsOnlineSpreadsheetOpen(true);
                 }}
                 className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-lg text-xs font-bold shadow-xs hover:shadow-md transition-all cursor-pointer active:scale-95 border border-emerald-500"
                 id="online-spreadsheet-modal-trigger"
-                title="Mở biểu mẫu trực tuyến 2 chiều để sửa đổi, thêm, xóa trực tiếp (Tự động cập nhật lên web)"
+                title="Mở biểu mẫu trực tuyến 2 chiều để sửa đổi, thêm, xóa trực tiếp (Yêu cầu quyền Quản trị viên)"
               >
                 <FileSpreadsheet className="w-4 h-4 text-emerald-200" />
                 <span>Biểu Mẫu Online (Sửa 2 chiều)</span>
@@ -1326,7 +1344,10 @@ export default function App() {
                 onPullFromServer={handleForcePullFromServer}
                 serverLastUpdated={serverLastUpdated}
                 isServerSyncing={isServerSyncing}
-                onOpenOnlineSpreadsheet={() => setIsOnlineSpreadsheetOpen(true)}
+                onOpenOnlineSpreadsheet={() => {
+                  if (!checkAdminPermission('Mở và điều chỉnh Biểu mẫu Online 2 chiều', () => setIsOnlineSpreadsheetOpen(true))) return;
+                  setIsOnlineSpreadsheetOpen(true);
+                }}
               />
 
               <div className="h-6 w-px bg-slate-200 mx-1 hidden sm:block"></div>

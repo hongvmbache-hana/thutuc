@@ -15,7 +15,8 @@ import {
   Database,
   Globe,
   Loader2,
-  Lock
+  Lock,
+  ShieldAlert
 } from 'lucide-react';
 import ExcelJS from 'exceljs';
 import { fetchOnlineSpreadsheet, parseSpreadsheetBuffer } from '../utils/onlineExcelSync';
@@ -39,7 +40,7 @@ export default function ImportExcelModal({
   onImportSuccess,
   onShowToast,
   onAddNewPresets,
-  isAdminLoggedIn = true,
+  isAdminLoggedIn = false,
   onRequireAdminLogin
 }: ImportExcelModalProps) {
   const [file, setFile] = useState<File | null>(null);
@@ -61,6 +62,15 @@ export default function ImportExcelModal({
 
   // Handler to fetch and load procedures directly from configured online Excel URL
   const handleLoadFromOnlineUrl = async () => {
+    if (!isAdminLoggedIn) {
+      onShowToast('Chỉ Quản trị viên mới có quyền nạp dữ liệu từ biểu mẫu online!', 'error');
+      if (onRequireAdminLogin) {
+        onClose();
+        onRequireAdminLogin();
+      }
+      return;
+    }
+
     if (!configuredOnlineUrl) {
       onShowToast('Chưa cấu hình đường dẫn biểu mẫu Excel Online trong Ban Quản Trị.', 'error');
       return;
@@ -285,6 +295,15 @@ export default function ImportExcelModal({
 
   // 2. PARSE EXCEL / CSV FILE (Sử dụng bộ phân tích thông minh chuẩn hóa Tên, Mã TTHC và Lĩnh vực)
   const processExcelFile = async (uploadedFile: File) => {
+    if (!isAdminLoggedIn) {
+      onShowToast('Chỉ Quản trị viên mới có quyền nạp tệp dữ liệu vào hệ thống!', 'error');
+      if (onRequireAdminLogin) {
+        onClose();
+        onRequireAdminLogin();
+      }
+      return;
+    }
+
     setIsParsing(true);
     setFile(uploadedFile);
 
@@ -400,6 +419,28 @@ export default function ImportExcelModal({
             <X className="w-6 h-6" />
           </button>
         </div>
+
+        {/* Security Warning Banner when not admin */}
+        {!isAdminLoggedIn && (
+          <div className="bg-amber-500 text-slate-950 px-6 py-2.5 text-xs font-bold flex flex-wrap items-center justify-between gap-2 border-b border-amber-600 shadow-inner">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="w-5 h-5 text-slate-950 shrink-0" />
+              <span>YÊU CẦU QUYỀN QUẢN TRỊ VIÊN: Chỉ tài khoản Quản trị viên mới có quyền nạp/nhập dữ liệu thủ tục hành chính vào hệ thống!</span>
+            </div>
+            {onRequireAdminLogin && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onRequireAdminLogin();
+                }}
+                className="px-3 py-1 bg-slate-950 hover:bg-slate-900 text-white rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95"
+              >
+                Đăng nhập Quản trị viên
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Body Content */}
         <div className="p-6 overflow-y-auto flex-1 space-y-6">
@@ -649,15 +690,32 @@ export default function ImportExcelModal({
           </button>
 
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleConfirmImport}
-              disabled={parsedProcedures.length === 0}
-              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-red-700 to-red-800 hover:from-red-800 hover:to-red-900 disabled:from-slate-400 disabled:to-slate-400 text-white rounded-lg text-xs font-bold shadow-md transition-all cursor-pointer disabled:cursor-not-allowed active:scale-95"
-            >
-              <Database className="w-4 h-4" />
-              <span>Nạp {parsedProcedures.length} thủ tục vào hệ thống</span>
-            </button>
+            {!isAdminLoggedIn ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onShowToast('Vui lòng đăng nhập Quản trị viên để có quyền nạp dữ liệu vào hệ thống!', 'error');
+                  if (onRequireAdminLogin) {
+                    onClose();
+                    onRequireAdminLogin();
+                  }
+                }}
+                className="flex items-center gap-2 px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold shadow-md transition-all cursor-pointer active:scale-95"
+              >
+                <Lock className="w-4 h-4" />
+                <span>Đăng nhập Quản trị viên để Nạp dữ liệu</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleConfirmImport}
+                disabled={parsedProcedures.length === 0}
+                className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-red-700 to-red-800 hover:from-red-800 hover:to-red-900 disabled:from-slate-400 disabled:to-slate-400 text-white rounded-lg text-xs font-bold shadow-md transition-all cursor-pointer disabled:cursor-not-allowed active:scale-95"
+              >
+                <Database className="w-4 h-4" />
+                <span>Nạp {parsedProcedures.length} thủ tục vào hệ thống</span>
+              </button>
+            )}
           </div>
         </div>
 

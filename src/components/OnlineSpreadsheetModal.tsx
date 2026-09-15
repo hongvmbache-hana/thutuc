@@ -24,7 +24,8 @@ import {
   AlertCircle,
   HelpCircle,
   Upload,
-  Lock
+  Lock,
+  ShieldAlert
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { Procedure, AppSettings } from '../types';
@@ -91,6 +92,12 @@ export default function OnlineSpreadsheetModal({
   const saveTimeoutRef = useRef<any>(null);
 
   const triggerSave = useCallback((dataToSave: Procedure[], notify = false) => {
+    if (!isAdminLoggedIn) {
+      onShowToast('Chỉ Quản trị viên mới có quyền điều chỉnh và lưu dữ liệu biểu mẫu online!', 'error');
+      if (onRequireAdminLogin) onRequireAdminLogin();
+      return;
+    }
+
     setIsSaving(true);
     // 1. Update parent state in App.tsx
     onUpdateProcedures(dataToSave);
@@ -500,6 +507,28 @@ export default function OnlineSpreadsheetModal({
           </div>
         </div>
 
+        {/* Security Warning Banner when not admin */}
+        {!isAdminLoggedIn && (
+          <div className="bg-amber-500 text-slate-950 px-4 sm:px-6 py-2.5 text-xs font-bold flex flex-wrap items-center justify-between gap-2 border-b border-amber-600 shrink-0 shadow-inner">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="w-5 h-5 text-slate-950 shrink-0" />
+              <span>CHẾ ĐỘ CHỈ ĐỌC: Bạn đang xem biểu mẫu online 2 chiều. Chỉ Quản trị viên mới được phép thêm, sửa, xóa, dán và đồng bộ dữ liệu!</span>
+            </div>
+            {onRequireAdminLogin && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onRequireAdminLogin();
+                }}
+                className="px-3 py-1 bg-slate-950 hover:bg-slate-900 text-white rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95 shrink-0"
+              >
+                Đăng nhập Quản trị viên để mở khóa sửa
+              </button>
+            )}
+          </div>
+        )}
+
         {/* 2. SPREADSHEET TOOLBAR */}
         <div className="bg-slate-100/90 px-4 py-2.5 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2.5 shrink-0">
           
@@ -508,16 +537,7 @@ export default function OnlineSpreadsheetModal({
             {!isAdminLoggedIn ? (
               <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-100/90 border border-amber-300 rounded-lg text-amber-900 text-xs font-semibold">
                 <Lock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-                <span className="hidden sm:inline">Chế độ Chỉ đọc:</span>
-                {onRequireAdminLogin && (
-                  <button
-                    type="button"
-                    onClick={onRequireAdminLogin}
-                    className="px-2 py-0.5 bg-amber-600 hover:bg-amber-700 text-white rounded font-bold text-[11px] cursor-pointer shadow-xs"
-                  >
-                    Đăng nhập Quản trị để Sửa
-                  </button>
-                )}
+                <span className="hidden sm:inline">Chỉ đọc: Cần quyền Quản trị viên để sửa</span>
               </div>
             ) : (
               <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-emerald-100 border border-emerald-300 rounded-lg text-emerald-800 text-[11px] font-bold">
@@ -529,10 +549,25 @@ export default function OnlineSpreadsheetModal({
             {/* Add Row Button */}
             <button
               type="button"
-              onClick={handleAddNewRow}
-              className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-xs cursor-pointer active:scale-95 transition-all"
+              onClick={() => {
+                if (!isAdminLoggedIn) {
+                  onShowToast('Chỉ Quản trị viên mới được phép thêm dòng thủ tục mới!', 'error');
+                  if (onRequireAdminLogin) {
+                    onClose();
+                    onRequireAdminLogin();
+                  }
+                  return;
+                }
+                handleAddNewRow();
+              }}
+              disabled={!isAdminLoggedIn}
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold shadow-xs transition-all ${
+                !isAdminLoggedIn 
+                  ? 'bg-slate-300 text-slate-500 cursor-not-allowed' 
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer active:scale-95'
+              }`}
               id="spreadsheet-add-row-btn"
-              title="Thêm 1 dòng thủ tục mới lên đầu biểu mẫu"
+              title={isAdminLoggedIn ? "Thêm 1 dòng thủ tục mới lên đầu biểu mẫu" : "Yêu cầu quyền Quản trị viên"}
             >
               <Plus className="w-4 h-4" />
               <span>Thêm dòng mới</span>
@@ -544,14 +579,21 @@ export default function OnlineSpreadsheetModal({
               onClick={() => {
                 if (!isAdminLoggedIn) {
                   onShowToast('Vui lòng đăng nhập Quản trị viên để lưu cập nhật dữ liệu!', 'error');
-                  if (onRequireAdminLogin) onRequireAdminLogin();
+                  if (onRequireAdminLogin) {
+                    onClose();
+                    onRequireAdminLogin();
+                  }
                   return;
                 }
                 triggerSave(gridData, true);
               }}
-              disabled={isSaving}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-xs cursor-pointer active:scale-95 transition-all disabled:opacity-50"
-              title="Lưu tất cả thay đổi ngay lập tức lên Cổng Web & Máy chủ"
+              disabled={isSaving || !isAdminLoggedIn}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold shadow-xs transition-all ${
+                !isAdminLoggedIn
+                  ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white cursor-pointer active:scale-95'
+              }`}
+              title={isAdminLoggedIn ? "Lưu tất cả thay đổi ngay lập tức lên Cổng Web & Máy chủ" : "Yêu cầu quyền Quản trị viên"}
             >
               <Save className="w-3.5 h-3.5" />
               <span>{isSaving ? 'Đang lưu...' : 'Lưu & Cập nhật Web'}</span>
@@ -560,9 +602,24 @@ export default function OnlineSpreadsheetModal({
             {/* Paste from Excel Button */}
             <button
               type="button"
-              onClick={() => setIsPasteModalOpen(true)}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg text-xs font-semibold shadow-xs cursor-pointer transition-colors"
-              title="Sao chép từ Excel hoặc Google Sheets rồi dán vào đây"
+              onClick={() => {
+                if (!isAdminLoggedIn) {
+                  onShowToast('Chỉ Quản trị viên mới được phép dán dữ liệu vào biểu mẫu!', 'error');
+                  if (onRequireAdminLogin) {
+                    onClose();
+                    onRequireAdminLogin();
+                  }
+                  return;
+                }
+                setIsPasteModalOpen(true);
+              }}
+              disabled={!isAdminLoggedIn}
+              className={`flex items-center gap-1 px-2.5 py-1.5 border rounded-lg text-xs font-semibold shadow-xs transition-colors ${
+                !isAdminLoggedIn
+                  ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                  : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-300 cursor-pointer'
+              }`}
+              title={isAdminLoggedIn ? "Sao chép từ Excel hoặc Google Sheets rồi dán vào đây" : "Yêu cầu quyền Quản trị viên"}
             >
               <ClipboardPaste className="w-3.5 h-3.5 text-indigo-600" />
               <span className="hidden sm:inline">Dán từ Excel</span>
@@ -761,8 +818,11 @@ export default function OnlineSpreadsheetModal({
                         type="text"
                         value={row.maTthc || ''}
                         placeholder="1.014352..."
+                        readOnly={!isAdminLoggedIn}
                         onChange={(e) => handleCellChange(row.id, 'maTthc', e.target.value)}
-                        className="w-full bg-transparent px-2 py-1 rounded font-mono font-bold text-red-800 text-xs focus:bg-white focus:ring-1 focus:ring-emerald-500 focus:outline-none hover:bg-slate-100"
+                        className={`w-full bg-transparent px-2 py-1 rounded font-mono font-bold text-red-800 text-xs focus:ring-1 focus:ring-emerald-500 focus:outline-none ${
+                          !isAdminLoggedIn ? 'cursor-default select-text' : 'focus:bg-white hover:bg-slate-100'
+                        }`}
                       />
                     </td>
 
@@ -772,8 +832,11 @@ export default function OnlineSpreadsheetModal({
                         rows={1}
                         value={row.tenTthc || ''}
                         placeholder="Nhập tên thủ tục hành chính..."
+                        readOnly={!isAdminLoggedIn}
                         onChange={(e) => handleCellChange(row.id, 'tenTthc', e.target.value)}
-                        className="w-full bg-transparent px-2 py-1 rounded font-medium text-slate-800 text-xs focus:bg-white focus:ring-1 focus:ring-emerald-500 focus:outline-none hover:bg-slate-100 resize-none overflow-hidden"
+                        className={`w-full bg-transparent px-2 py-1 rounded font-medium text-slate-800 text-xs focus:ring-1 focus:ring-emerald-500 focus:outline-none resize-none overflow-hidden ${
+                          !isAdminLoggedIn ? 'cursor-default select-text' : 'focus:bg-white hover:bg-slate-100'
+                        }`}
                         style={{ minHeight: '32px' }}
                       />
                     </td>
@@ -785,8 +848,11 @@ export default function OnlineSpreadsheetModal({
                         list="linhvuc-suggestions"
                         value={row.linhVuc || ''}
                         placeholder="Lĩnh vực..."
+                        readOnly={!isAdminLoggedIn}
                         onChange={(e) => handleCellChange(row.id, 'linhVuc', e.target.value)}
-                        className="w-full bg-transparent px-2 py-1 rounded text-slate-700 text-xs focus:bg-white focus:ring-1 focus:ring-emerald-500 focus:outline-none hover:bg-slate-100"
+                        className={`w-full bg-transparent px-2 py-1 rounded text-slate-700 text-xs focus:ring-1 focus:ring-emerald-500 focus:outline-none ${
+                          !isAdminLoggedIn ? 'cursor-default select-text' : 'focus:bg-white hover:bg-slate-100'
+                        }`}
                       />
                     </td>
 
@@ -797,8 +863,11 @@ export default function OnlineSpreadsheetModal({
                         list="songanh-suggestions"
                         value={row.soNganh || ''}
                         placeholder="Bộ ngành..."
+                        readOnly={!isAdminLoggedIn}
                         onChange={(e) => handleCellChange(row.id, 'soNganh', e.target.value)}
-                        className="w-full bg-transparent px-2 py-1 rounded text-slate-700 text-xs focus:bg-white focus:ring-1 focus:ring-emerald-500 focus:outline-none hover:bg-slate-100"
+                        className={`w-full bg-transparent px-2 py-1 rounded text-slate-700 text-xs focus:ring-1 focus:ring-emerald-500 focus:outline-none ${
+                          !isAdminLoggedIn ? 'cursor-default select-text' : 'focus:bg-white hover:bg-slate-100'
+                        }`}
                       />
                     </td>
 
@@ -806,8 +875,11 @@ export default function OnlineSpreadsheetModal({
                     <td className="p-1 border-r border-slate-200">
                       <select
                         value={row.capThucHien || 'Cấp xã'}
+                        disabled={!isAdminLoggedIn}
                         onChange={(e) => handleCellChange(row.id, 'capThucHien', e.target.value)}
-                        className="w-full bg-transparent px-1 py-1 rounded text-slate-700 text-xs focus:bg-white focus:ring-1 focus:ring-emerald-500 focus:outline-none cursor-pointer"
+                        className={`w-full bg-transparent px-1 py-1 rounded text-slate-700 text-xs focus:bg-white focus:ring-1 focus:ring-emerald-500 focus:outline-none ${
+                          !isAdminLoggedIn ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'
+                        }`}
                       >
                         <option value="Cấp xã">Cấp xã</option>
                         <option value="Thành phố">Thành phố</option>
@@ -822,8 +894,11 @@ export default function OnlineSpreadsheetModal({
                         type="text"
                         value={row.canCuPhapLy || ''}
                         placeholder="Căn cứ pháp lý..."
+                        readOnly={!isAdminLoggedIn}
                         onChange={(e) => handleCellChange(row.id, 'canCuPhapLy', e.target.value)}
-                        className="w-full bg-transparent px-2 py-1 rounded text-slate-600 text-xs focus:bg-white focus:ring-1 focus:ring-emerald-500 focus:outline-none hover:bg-slate-100"
+                        className={`w-full bg-transparent px-2 py-1 rounded text-slate-600 text-xs focus:ring-1 focus:ring-emerald-500 focus:outline-none ${
+                          !isAdminLoggedIn ? 'cursor-default select-text' : 'focus:bg-white hover:bg-slate-100'
+                        }`}
                       />
                     </td>
 
@@ -834,8 +909,11 @@ export default function OnlineSpreadsheetModal({
                           type="text"
                           value={row.ghiChu || ''}
                           placeholder="https://dichvucong.gov.vn/..."
+                          readOnly={!isAdminLoggedIn}
                           onChange={(e) => handleCellChange(row.id, 'ghiChu', e.target.value)}
-                          className="flex-1 bg-transparent px-2 py-1 rounded text-indigo-700 text-xs focus:bg-white focus:ring-1 focus:ring-emerald-500 focus:outline-none hover:bg-slate-100 truncate"
+                          className={`flex-1 bg-transparent px-2 py-1 rounded text-indigo-700 text-xs focus:ring-1 focus:ring-emerald-500 focus:outline-none truncate ${
+                            !isAdminLoggedIn ? 'cursor-default select-text' : 'focus:bg-white hover:bg-slate-100'
+                          }`}
                         />
                         <button
                           type="button"
@@ -852,8 +930,23 @@ export default function OnlineSpreadsheetModal({
                     <td className="p-1 text-center border-r border-slate-200">
                       <button
                         type="button"
-                        onClick={() => handleCellChange(row.id, 'bcciTiepNhan', !row.bcciTiepNhan)}
-                        className={`px-2.5 py-0.5 rounded text-[11px] font-bold cursor-pointer transition-all ${
+                        onClick={() => {
+                          if (!isAdminLoggedIn) {
+                            onShowToast('Chỉ Quản trị viên mới có quyền điều chỉnh dữ liệu này!', 'error');
+                            if (onRequireAdminLogin) {
+                              onClose();
+                              onRequireAdminLogin();
+                            }
+                            return;
+                          }
+                          handleCellChange(row.id, 'bcciTiepNhan', !row.bcciTiepNhan);
+                        }}
+                        disabled={!isAdminLoggedIn}
+                        className={`px-2.5 py-0.5 rounded text-[11px] font-bold transition-all ${
+                          !isAdminLoggedIn 
+                            ? 'cursor-not-allowed opacity-80' 
+                            : 'cursor-pointer'
+                        } ${
                           row.bcciTiepNhan 
                             ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' 
                             : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
@@ -867,8 +960,23 @@ export default function OnlineSpreadsheetModal({
                     <td className="p-1 text-center border-r border-slate-200">
                       <button
                         type="button"
-                        onClick={() => handleCellChange(row.id, 'bcciTraKetQua', !row.bcciTraKetQua)}
-                        className={`px-2.5 py-0.5 rounded text-[11px] font-bold cursor-pointer transition-all ${
+                        onClick={() => {
+                          if (!isAdminLoggedIn) {
+                            onShowToast('Chỉ Quản trị viên mới có quyền điều chỉnh dữ liệu này!', 'error');
+                            if (onRequireAdminLogin) {
+                              onClose();
+                              onRequireAdminLogin();
+                            }
+                            return;
+                          }
+                          handleCellChange(row.id, 'bcciTraKetQua', !row.bcciTraKetQua);
+                        }}
+                        disabled={!isAdminLoggedIn}
+                        className={`px-2.5 py-0.5 rounded text-[11px] font-bold transition-all ${
+                          !isAdminLoggedIn 
+                            ? 'cursor-not-allowed opacity-80' 
+                            : 'cursor-pointer'
+                        } ${
                           row.bcciTraKetQua 
                             ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' 
                             : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
@@ -882,8 +990,23 @@ export default function OnlineSpreadsheetModal({
                     <td className="p-1 text-center border-r border-slate-200">
                       <button
                         type="button"
-                        onClick={() => handleCellChange(row.id, 'motCua', !row.motCua)}
-                        className={`px-2.5 py-0.5 rounded text-[11px] font-bold cursor-pointer transition-all ${
+                        onClick={() => {
+                          if (!isAdminLoggedIn) {
+                            onShowToast('Chỉ Quản trị viên mới có quyền điều chỉnh dữ liệu này!', 'error');
+                            if (onRequireAdminLogin) {
+                              onClose();
+                              onRequireAdminLogin();
+                            }
+                            return;
+                          }
+                          handleCellChange(row.id, 'motCua', !row.motCua);
+                        }}
+                        disabled={!isAdminLoggedIn}
+                        className={`px-2.5 py-0.5 rounded text-[11px] font-bold transition-all ${
+                          !isAdminLoggedIn 
+                            ? 'cursor-not-allowed opacity-80' 
+                            : 'cursor-pointer'
+                        } ${
                           row.motCua 
                             ? 'bg-blue-100 text-blue-800 hover:bg-blue-200' 
                             : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
@@ -897,8 +1020,11 @@ export default function OnlineSpreadsheetModal({
                     <td className="p-1 text-center border-r border-slate-200">
                       <select
                         value={row.dvcttLoai || 'Không'}
+                        disabled={!isAdminLoggedIn}
                         onChange={(e) => handleCellChange(row.id, 'dvcttLoai', e.target.value)}
-                        className={`text-[11px] font-bold rounded px-1.5 py-0.5 focus:outline-none cursor-pointer ${
+                        className={`text-[11px] font-bold rounded px-1.5 py-0.5 focus:outline-none ${
+                          !isAdminLoggedIn ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'
+                        } ${
                           row.dvcttLoai === 'Toàn trình' 
                             ? 'bg-emerald-50 text-emerald-700 border border-emerald-300' 
                             : row.dvcttLoai === 'Một phần' 
@@ -916,8 +1042,23 @@ export default function OnlineSpreadsheetModal({
                     <td className="p-1 text-center border-r border-slate-200">
                       <button
                         type="button"
-                        onClick={() => handleCellChange(row.id, 'dungChung', !row.dungChung)}
-                        className={`px-2.5 py-0.5 rounded text-[11px] font-bold cursor-pointer transition-all ${
+                        onClick={() => {
+                          if (!isAdminLoggedIn) {
+                            onShowToast('Chỉ Quản trị viên mới có quyền điều chỉnh dữ liệu này!', 'error');
+                            if (onRequireAdminLogin) {
+                              onClose();
+                              onRequireAdminLogin();
+                            }
+                            return;
+                          }
+                          handleCellChange(row.id, 'dungChung', !row.dungChung);
+                        }}
+                        disabled={!isAdminLoggedIn}
+                        className={`px-2.5 py-0.5 rounded text-[11px] font-bold transition-all ${
+                          !isAdminLoggedIn 
+                            ? 'cursor-not-allowed opacity-80' 
+                            : 'cursor-pointer'
+                        } ${
                           row.dungChung 
                             ? 'bg-purple-100 text-purple-800 hover:bg-purple-200' 
                             : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
@@ -932,17 +1073,47 @@ export default function OnlineSpreadsheetModal({
                       <div className="flex items-center justify-center space-x-1">
                         <button
                           type="button"
-                          onClick={() => handleDuplicateRow(row)}
-                          className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors cursor-pointer"
-                          title="Nhân bản dòng này"
+                          onClick={() => {
+                            if (!isAdminLoggedIn) {
+                              onShowToast('Chỉ Quản trị viên mới có quyền nhân bản thủ tục!', 'error');
+                              if (onRequireAdminLogin) {
+                                onClose();
+                                onRequireAdminLogin();
+                              }
+                              return;
+                            }
+                            handleDuplicateRow(row);
+                          }}
+                          disabled={!isAdminLoggedIn}
+                          className={`p-1 rounded transition-colors ${
+                            !isAdminLoggedIn 
+                              ? 'text-slate-300 cursor-not-allowed' 
+                              : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 cursor-pointer'
+                          }`}
+                          title={isAdminLoggedIn ? "Nhân bản dòng này" : "Yêu cầu quyền Quản trị viên"}
                         >
                           <Copy className="w-3.5 h-3.5" />
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleDeleteRow(row.id, row.maTthc)}
-                          className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
-                          title="Xóa dòng này"
+                          onClick={() => {
+                            if (!isAdminLoggedIn) {
+                              onShowToast('Chỉ Quản trị viên mới có quyền xóa thủ tục!', 'error');
+                              if (onRequireAdminLogin) {
+                                onClose();
+                                onRequireAdminLogin();
+                              }
+                              return;
+                            }
+                            handleDeleteRow(row.id, row.maTthc);
+                          }}
+                          disabled={!isAdminLoggedIn}
+                          className={`p-1 rounded transition-colors ${
+                            !isAdminLoggedIn 
+                              ? 'text-slate-300 cursor-not-allowed' 
+                              : 'text-slate-400 hover:text-red-600 hover:bg-red-50 cursor-pointer'
+                          }`}
+                          title={isAdminLoggedIn ? "Xóa dòng này" : "Yêu cầu quyền Quản trị viên"}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -997,9 +1168,24 @@ export default function OnlineSpreadsheetModal({
             </button>
             <button
               type="button"
-              onClick={() => triggerSave(gridData, true)}
-              disabled={isSaving}
-              className="px-4.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow-md cursor-pointer transition-colors flex items-center gap-1.5"
+              onClick={() => {
+                if (!isAdminLoggedIn) {
+                  onShowToast('Chỉ Quản trị viên mới có quyền cập nhật dữ liệu lên Cổng Web!', 'error');
+                  if (onRequireAdminLogin) {
+                    onClose();
+                    onRequireAdminLogin();
+                  }
+                  return;
+                }
+                triggerSave(gridData, true);
+              }}
+              disabled={isSaving || !isAdminLoggedIn}
+              className={`px-4.5 py-1.5 rounded-lg font-bold text-xs shadow-md transition-colors flex items-center gap-1.5 ${
+                !isAdminLoggedIn
+                  ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer active:scale-95'
+              }`}
+              title={isAdminLoggedIn ? "Hoàn tất và cập nhật dữ liệu lên Web" : "Yêu cầu quyền Quản trị viên"}
             >
               <Save className="w-3.5 h-3.5" />
               <span>Hoàn tất & Cập nhật Web</span>

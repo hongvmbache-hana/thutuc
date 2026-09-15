@@ -227,6 +227,10 @@ export default function AdminPanel({
 
   // Save specifically online Excel configuration
   const handleSaveOnlineConfig = () => {
+    if (!isAuthorized) {
+      onShowToast('Chỉ Quản trị viên mới được phép lưu cấu hình biểu mẫu online!', 'error');
+      return;
+    }
     const updated: AppSettings = {
       ...settings,
       onlineExcelUrl: onlineExcelUrl.trim(),
@@ -266,6 +270,10 @@ export default function AdminPanel({
 
   // Execute online sync directly into procedure catalog
   const handleExecuteOnlineSync = (modeOverride?: 'merge' | 'add_only' | 'replace_all') => {
+    if (!isAuthorized) {
+      onShowToast('Chỉ Quản trị viên mới có quyền đồng bộ dữ liệu biểu mẫu online!', 'error');
+      return;
+    }
     if (!onImportSuccess) {
       onShowToast('Chức năng cập nhật thủ tục chưa được kích hoạt ở màn hình chính.', 'error');
       return;
@@ -1051,6 +1059,10 @@ export default function AdminPanel({
                             <button
                               type="button"
                               onClick={() => {
+                                if (!isAuthorized) {
+                                  onShowToast('Chỉ Quản trị viên mới được phép khôi phục dữ liệu gốc!', 'error');
+                                  return;
+                                }
                                 if (onResetToPresets) {
                                   onResetToPresets();
                                 }
@@ -1076,6 +1088,10 @@ export default function AdminPanel({
                             <button
                               type="button"
                               onClick={() => {
+                                if (!isAuthorized) {
+                                  onShowToast('Chỉ Quản trị viên mới được phép tải bản sao lưu CSDL!', 'error');
+                                  return;
+                                }
                                 if (onBackupDownload) {
                                   onBackupDownload();
                                 }
@@ -1204,6 +1220,10 @@ export default function AdminPanel({
                           <button
                             type="button"
                             onClick={() => {
+                              if (!isAuthorized) {
+                                onShowToast('Chỉ Quản trị viên mới được phép mở và điều chỉnh Biểu mẫu Online 2 chiều!', 'error');
+                                return;
+                              }
                               onOpenOnlineSpreadsheet();
                             }}
                             className="shrink-0 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-xl text-xs shadow-lg transition-all cursor-pointer active:scale-95 flex items-center gap-2"
