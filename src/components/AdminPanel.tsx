@@ -192,7 +192,7 @@ export default function AdminPanel({
       
       onShowToast(`Đăng nhập thành công với tài khoản quản trị ${displayName}! Đã mở toàn quyền Thêm, Sửa, Xóa.`, 'success');
     } else {
-      setErrorMsg(auth.error || 'Tên đăng nhập hoặc mật khẩu quản trị không chính xác. Vui lòng thử tài khoản Hongvm / Vungochan@2015');
+      setErrorMsg(auth.error || 'Tên đăng nhập hoặc mật khẩu quản trị không chính xác. Vui lòng kiểm tra lại.');
       onShowToast('Đăng nhập thất bại! Vui lòng kiểm tra lại tài khoản hoặc mật khẩu.', 'error');
     }
   };
@@ -610,7 +610,7 @@ export default function AdminPanel({
                       <input
                         type="text"
                         required
-                        placeholder="Ví dụ: Hongvm hoặc admin"
+                        placeholder="Ví dụ: canbo_motcua hoặc email..."
                         className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:border-red-600 focus:bg-white transition-colors"
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
@@ -623,7 +623,7 @@ export default function AdminPanel({
                       <input
                         type="password"
                         required
-                        placeholder="Nhập mật khẩu quản trị"
+                        placeholder="Nhập mật khẩu..."
                         className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:border-red-600 focus:bg-white transition-colors"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
@@ -639,53 +639,6 @@ export default function AdminPanel({
                       <LogIn className="w-4 h-4" />
                       <span>Xác thực & Mở quyền Quản trị (Thêm, Sửa, Xóa)</span>
                     </button>
-                  </div>
-
-                  {/* Quick-fill helper for convenience */}
-                  <div className="bg-amber-50/80 border border-amber-200 rounded-xl p-3.5 space-y-2">
-                    <div className="flex items-center gap-1.5 text-amber-900 font-bold text-xs uppercase tracking-wider">
-                      <Lock className="w-3.5 h-3.5 text-amber-700" />
-                      <span>Thông tin tài khoản quản trị hệ thống</span>
-                    </div>
-                    <div className="space-y-1.5 text-xs">
-                      <div className="flex items-center justify-between p-2 bg-white rounded-lg border border-amber-200 shadow-xs">
-                        <div>
-                          <span className="font-bold text-red-900 font-mono">Hongvm</span>
-                          <span className="text-slate-400 mx-1.5">•</span>
-                          <span className="text-slate-600 font-mono text-[11px]">Vungochan@2015</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setUsername('Hongvm');
-                            setPassword('Vungochan@2015');
-                            setErrorMsg('');
-                          }}
-                          className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded font-bold text-[10.5px] cursor-pointer"
-                        >
-                          Điền tự động
-                        </button>
-                      </div>
-
-                      <div className="flex items-center justify-between p-2 bg-white rounded-lg border border-amber-200 shadow-xs">
-                        <div>
-                          <span className="font-bold text-slate-800 font-mono">admin</span>
-                          <span className="text-slate-400 mx-1.5">•</span>
-                          <span className="text-slate-600 font-mono text-[11px]">Vungochan@2015</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setUsername('admin');
-                            setPassword('Vungochan@2015');
-                            setErrorMsg('');
-                          }}
-                          className="px-2.5 py-1 bg-slate-800 hover:bg-slate-900 text-white rounded font-bold text-[10.5px] cursor-pointer"
-                        >
-                          Điền tự động
-                        </button>
-                      </div>
-                    </div>
                   </div>
                 </form>
               ) : (

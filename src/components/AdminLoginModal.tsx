@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, Shield, KeyRound, User, X, Check, AlertCircle, Sparkles, LogIn, Eye, EyeOff } from 'lucide-react';
+import { Lock, Shield, KeyRound, User, X, AlertCircle, LogIn, Eye, EyeOff } from 'lucide-react';
 import { authenticateUser } from '../utils/userManagement';
 
 interface AdminLoginModalProps {
@@ -68,28 +68,6 @@ export default function AdminLoginModal({
     }
   };
 
-  const handleQuickFill = (user: string, pass: string) => {
-    setUsername(user);
-    setPassword(pass);
-    setError(null);
-  };
-
-  const handleInstantLogin = (user: string, pass: string) => {
-    setUsername(user);
-    setPassword(pass);
-    setError(null);
-    const authResult = authenticateUser(user, pass);
-    const displayName = (authResult.user && `${authResult.user.fullName} (${authResult.user.role === 'admin' ? 'Quản trị viên' : 'Cán bộ'})`) || 
-      (user.toLowerCase() === 'hongvm' ? 'Hongvm (Quản trị viên)' : 'Admin Quản trị');
-    localStorage.setItem('tthc_is_admin_logged_in', 'true');
-    localStorage.setItem('tthc_admin_username', user);
-    localStorage.setItem('tthc_admin_fullname', displayName);
-    localStorage.setItem('tthc_admin_role', authResult.user?.role || 'admin');
-    onLoginSuccess(displayName);
-    onShowToast(`Đăng nhập thành công với tài khoản ${displayName}!`, 'success');
-    onClose();
-  };
-
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4">
       <div 
@@ -156,7 +134,7 @@ export default function AdminLoginModal({
                     setUsername(e.target.value);
                     if (error) setError(null);
                   }}
-                  placeholder="Nhập Hongvm hoặc admin..."
+                  placeholder="Ví dụ: canbo_motcua hoặc email..."
                   className="w-full pl-9.5 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-100 transition-all"
                   autoFocus
                   required
@@ -179,7 +157,7 @@ export default function AdminLoginModal({
                     setPassword(e.target.value);
                     if (error) setError(null);
                   }}
-                  placeholder="Nhập mật khẩu quản trị..."
+                  placeholder="Nhập mật khẩu..."
                   className="w-full pl-9.5 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:bg-white focus:border-red-600 focus:ring-2 focus:ring-red-100 transition-all"
                   required
                 />
@@ -203,42 +181,6 @@ export default function AdminLoginModal({
               </button>
             </div>
           </form>
-
-          {/* Quick-login shortcuts for convenience */}
-          <div className="pt-3 border-t border-slate-100">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-amber-500" /> Đăng nhập nhanh
-              </span>
-              <span className="text-[10px] text-slate-400">1-click xác thực</span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleInstantLogin('Hongvm', 'Vungochan@2015')}
-                className="p-2.5 bg-red-50/70 hover:bg-red-100 border border-red-200/80 rounded-xl text-left transition-all group cursor-pointer"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-red-950 group-hover:text-red-700">Hongvm</span>
-                  <span className="text-[10px] px-1.5 py-0.5 bg-red-200/60 text-red-900 font-mono rounded">Admin</span>
-                </div>
-                <span className="text-[10.5px] text-red-700 font-mono block mt-0.5">Vungochan@2015</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleInstantLogin('admin', 'Vungochan@2015')}
-                className="p-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-left transition-all group cursor-pointer"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-800 group-hover:text-slate-900">admin</span>
-                  <span className="text-[10px] px-1.5 py-0.5 bg-slate-200 text-slate-700 font-mono rounded">Root</span>
-                </div>
-                <span className="text-[10.5px] text-slate-600 font-mono block mt-0.5">Vungochan@2015</span>
-              </button>
-            </div>
-          </div>
         </div>
 
         {/* Footer info */}

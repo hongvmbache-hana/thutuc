@@ -2023,10 +2023,10 @@ export default function App() {
         }}
         onShowToast={showToast}
         onLoginSuccess={(displayName) => {
-          localStorage.setItem('tthc_admin_username', displayName || 'Hongvm');
+          localStorage.setItem('tthc_admin_username', displayName || 'Quản trị viên');
           handleAdminLoggedInChange(true);
           setIsAdminLoginModalOpen(false);
-          showToast(`Đăng nhập Quản trị viên thành công (${displayName || 'Hongvm'})! Bạn đã có quyền Thêm, Sửa, Xóa dữ liệu.`, 'success');
+          showToast(`Đăng nhập Quản trị viên thành công (${displayName || 'Quản trị viên'})! Bạn đã có quyền Thêm, Sửa, Xóa dữ liệu.`, 'success');
           if (pendingAction) {
             const action = pendingAction;
             setPendingAction(null);
