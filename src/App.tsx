@@ -1023,18 +1023,20 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-2 text-xs">
-            <button
-              type="button"
-              onClick={() => {
-                if (!checkAdminPermission('Mở và điều chỉnh Biểu mẫu Online 2 chiều', () => setIsOnlineSpreadsheetOpen(true))) return;
-                setIsOnlineSpreadsheetOpen(true);
-              }}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700/90 hover:bg-emerald-600 text-emerald-100 rounded-lg text-xs font-semibold cursor-pointer border border-emerald-600 transition-colors"
-              title="Mở biểu mẫu đồng bộ 2 chiều với Google Sheets / Excel Online (Yêu cầu quyền Quản trị viên)"
-            >
-              <Globe className="w-3.5 h-3.5 text-emerald-300" />
-              <span>Biểu mẫu Online</span>
-            </button>
+            {isAdminLoggedIn && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (!checkAdminPermission('Mở và điều chỉnh Biểu mẫu Online 2 chiều', () => setIsOnlineSpreadsheetOpen(true))) return;
+                  setIsOnlineSpreadsheetOpen(true);
+                }}
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700/90 hover:bg-emerald-600 text-emerald-100 rounded-lg text-xs font-semibold cursor-pointer border border-emerald-600 transition-colors"
+                title="Mở biểu mẫu đồng bộ 2 chiều với Google Sheets / Excel Online (Yêu cầu quyền Quản trị viên)"
+              >
+                <Globe className="w-3.5 h-3.5 text-emerald-300" />
+                <span>Biểu mẫu Online</span>
+              </button>
+            )}
 
             {isAdminLoggedIn ? (
               <div className="flex items-center gap-1.5 bg-slate-800/90 p-1 rounded-lg border border-slate-700">
@@ -1181,146 +1183,189 @@ export default function App() {
             {/* General action buttons: Adding, backups and exports */}
             <div className="flex flex-wrap items-center gap-2 sm:self-center">
               
-              {/* Reset Default */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (!checkAdminPermission('Khôi phục danh sách thủ tục mặc định ban đầu', () => handleResetToPresets())) return;
-                  handleResetToPresets();
-                }}
-                className="flex items-center gap-1 px-2.5 py-2 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-semibold border border-slate-200 bg-white transition-colors cursor-pointer"
-                title="Khôi phục 11 thủ tục gốc đề xuất ban đầu (Yêu cầu quyền Quản trị viên)"
-                id="reset-to-origin-records"
-              >
-                Mặc định
-              </button>
+              {/* Các nút dành riêng cho Quản trị viên (Admin) */}
+              {isAdminLoggedIn && (
+                <>
+                  {/* Reset Default */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!checkAdminPermission('Khôi phục danh sách thủ tục mặc định ban đầu', () => handleResetToPresets())) return;
+                      handleResetToPresets();
+                    }}
+                    className="flex items-center gap-1 px-2.5 py-2 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-semibold border border-slate-200 bg-white transition-colors cursor-pointer"
+                    title="Khôi phục 11 thủ tục gốc đề xuất ban đầu (Yêu cầu quyền Quản trị viên)"
+                    id="reset-to-origin-records"
+                  >
+                    Mặc định
+                  </button>
 
-              {/* Data Import / Backup Controls */}
-              <div className="relative group/backup">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!checkAdminPermission('Sao lưu dữ liệu TTHC (.json)', () => handleBackupDownload())) return;
-                    handleBackupDownload();
-                  }}
-                  className="flex items-center gap-1.5 px-2.5 py-2 hover:bg-slate-200 text-indigo-700 rounded-lg text-xs font-semibold border border-slate-200 bg-white transition-colors cursor-pointer"
-                  title="Tải tệp JSON lưu trữ ngoại tuyến dữ liệu của bạn (Yêu cầu quyền Quản trị viên)"
-                >
-                  <DatabaseBackup className="w-4 h-4" />
-                  <span className="hidden md:inline">Sao lưu</span>
-                </button>
-              </div>
+                  {/* Data Import / Backup Controls */}
+                  <div className="relative group/backup">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!checkAdminPermission('Sao lưu dữ liệu TTHC (.json)', () => handleBackupDownload())) return;
+                        handleBackupDownload();
+                      }}
+                      className="flex items-center gap-1.5 px-2.5 py-2 hover:bg-slate-200 text-indigo-700 rounded-lg text-xs font-semibold border border-slate-200 bg-white transition-colors cursor-pointer"
+                      title="Tải tệp JSON lưu trữ ngoại tuyến dữ liệu của bạn (Yêu cầu quyền Quản trị viên)"
+                    >
+                      <DatabaseBackup className="w-4 h-4" />
+                      <span className="hidden md:inline">Sao lưu</span>
+                    </button>
+                  </div>
 
-              {/* Loader backup input */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (!checkAdminPermission('Nạp dữ liệu sao lưu TTHC (.json)', () => {
-                    document.getElementById('restore-file-input')?.click();
-                  })) return;
-                  document.getElementById('restore-file-input')?.click();
-                }}
-                className="flex items-center gap-1.5 px-2.5 py-2 hover:bg-indigo-50 border border-indigo-200 bg-indigo-50/20 text-indigo-700 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
-                title="Chọn tệp JSON đã lưu để nạp ngược lại vào hệ thống (Yêu cầu quyền Quản trị viên)"
-                id="restore-file-btn"
-              >
-                <Upload className="w-4 h-4" />
-                <span className="hidden md:inline">Nạp dữ liệu</span>
-              </button>
-              <input
-                type="file"
-                id="restore-file-input"
-                accept=".json"
-                className="hidden"
-                onChange={handleBackupUpload}
-              />
+                  {/* Loader backup input */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!checkAdminPermission('Nạp dữ liệu sao lưu TTHC (.json)', () => {
+                        document.getElementById('restore-file-input')?.click();
+                      })) return;
+                      document.getElementById('restore-file-input')?.click();
+                    }}
+                    className="flex items-center gap-1.5 px-2.5 py-2 hover:bg-indigo-50 border border-indigo-200 bg-indigo-50/20 text-indigo-700 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
+                    title="Chọn tệp JSON đã lưu để nạp ngược lại vào hệ thống (Yêu cầu quyền Quản trị viên)"
+                    id="restore-file-btn"
+                  >
+                    <Upload className="w-4 h-4" />
+                    <span className="hidden md:inline">Nạp dữ liệu</span>
+                  </button>
+                  <input
+                    type="file"
+                    id="restore-file-input"
+                    accept=".json"
+                    className="hidden"
+                    onChange={handleBackupUpload}
+                  />
+                </>
+              )}
 
-              {/* Export Button Wrapper */}
+              {/* Mục Xuất Excel & Xuất PDF: LUÔN HIỂN THỊ ĐỐI VỚI CẢ TÀI KHOẢN THƯỜNG VÀ QUẢN TRỊ VIÊN */}
               <ExportButton procedures={sortedProcedures} settings={settings} />
 
-              {/* Online Spreadsheet Modal Trigger - Direct 2-Way Sync */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (!checkAdminPermission('Mở và điều chỉnh Biểu mẫu Online 2 chiều', () => setIsOnlineSpreadsheetOpen(true))) return;
-                  setIsOnlineSpreadsheetOpen(true);
-                }}
-                className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-lg text-xs font-bold shadow-xs hover:shadow-md transition-all cursor-pointer active:scale-95 border border-emerald-500"
-                id="online-spreadsheet-modal-trigger"
-                title="Mở biểu mẫu trực tuyến 2 chiều để sửa đổi, thêm, xóa trực tiếp (Yêu cầu quyền Quản trị viên)"
-              >
-                <FileSpreadsheet className="w-4 h-4 text-emerald-200" />
-                <span>Biểu Mẫu Online (Sửa 2 chiều)</span>
-                <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse"></span>
-              </button>
+              {/* Các công cụ cấu hình & nhập liệu nâng cao - Chỉ hiển thị khi đăng nhập với vai trò Quản trị viên */}
+              {isAdminLoggedIn && (
+                <>
+                  {/* Online Spreadsheet Modal Trigger - Direct 2-Way Sync */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!checkAdminPermission('Mở và điều chỉnh Biểu mẫu Online 2 chiều', () => setIsOnlineSpreadsheetOpen(true))) return;
+                      setIsOnlineSpreadsheetOpen(true);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-lg text-xs font-bold shadow-xs hover:shadow-md transition-all cursor-pointer active:scale-95 border border-emerald-500"
+                    id="online-spreadsheet-modal-trigger"
+                    title="Mở biểu mẫu trực tuyến 2 chiều để sửa đổi, thêm, xóa trực tiếp (Yêu cầu quyền Quản trị viên)"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 text-emerald-200" />
+                    <span>Biểu Mẫu Online (Sửa 2 chiều)</span>
+                    <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse"></span>
+                  </button>
 
-              {/* Import from Excel Button */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (!checkAdminPermission('Nhập dữ liệu TTHC từ file Excel', () => setIsImportExcelOpen(true))) return;
-                  setIsImportExcelOpen(true);
-                }}
-                className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-95"
-                id="import-excel-modal-trigger"
-                title="Nhập dữ liệu thủ tục hàng loạt từ file Excel chuẩn kèm mã QR"
-              >
-                <FileUp className="w-4 h-4 text-emerald-700" />
-                <span>Nhập Excel</span>
-              </button>
+                  {/* Import from Excel Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!checkAdminPermission('Nhập dữ liệu TTHC từ file Excel', () => setIsImportExcelOpen(true))) return;
+                      setIsImportExcelOpen(true);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-95"
+                    id="import-excel-modal-trigger"
+                    title="Nhập dữ liệu thủ tục hàng loạt từ file Excel chuẩn kèm mã QR"
+                  >
+                    <FileUp className="w-4 h-4 text-emerald-700" />
+                    <span>Nhập Excel</span>
+                  </button>
 
-              {/* Quick Online Excel Sync button if URL configured */}
-              {settings.onlineExcelUrl && (
-                <button
-                  type="button"
-                  onClick={handleQuickSyncOnlineExcel}
-                  disabled={isSyncingOnline}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-300 rounded-lg text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-95"
-                  title="Đồng bộ tức thì từ biểu mẫu Excel Online đã cấu hình"
-                  id="quick-sync-online-excel-btn"
-                >
-                  {isSyncingOnline ? (
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-teal-700" />
-                  ) : (
-                    <Globe className="w-3.5 h-3.5 text-teal-700" />
+                  {/* Quick Online Excel Sync button if URL configured */}
+                  {settings.onlineExcelUrl && (
+                    <button
+                      type="button"
+                      onClick={handleQuickSyncOnlineExcel}
+                      disabled={isSyncingOnline}
+                      className="flex items-center gap-1.5 px-3 py-2 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-300 rounded-lg text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-95"
+                      title="Đồng bộ tức thì từ biểu mẫu Excel Online đã cấu hình"
+                      id="quick-sync-online-excel-btn"
+                    >
+                      {isSyncingOnline ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-teal-700" />
+                      ) : (
+                        <Globe className="w-3.5 h-3.5 text-teal-700" />
+                      )}
+                      <span>Đồng bộ Online</span>
+                    </button>
                   )}
-                  <span>Đồng bộ Online</span>
-                </button>
+
+                  {/* Delete Selected Button (visible when procedures are selected) */}
+                  {selectedIds.size > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleDeleteSelected}
+                      className="flex items-center gap-1.5 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold shadow-sm transition-all cursor-pointer active:scale-95 animate-fadeIn"
+                      title={`Xóa ${selectedIds.size} thủ tục hành chính đã chọn`}
+                      id="toolbar-delete-selected"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span>Xóa đã chọn ({selectedIds.size})</span>
+                    </button>
+                  )}
+
+                  {/* Delete All Procedures Button */}
+                  <button
+                    type="button"
+                    onClick={handleDeleteAllProcedures}
+                    disabled={procedures.length === 0}
+                    className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                      procedures.length === 0
+                        ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                        : 'bg-white hover:bg-rose-50 text-rose-700 border-rose-200 hover:border-rose-300'
+                    }`}
+                    title="Xóa toàn bộ thủ tục hành chính khỏi cơ sở dữ liệu"
+                    id="delete-all-procedures-btn"
+                  >
+                    <Trash2 className="w-4 h-4 text-rose-600" />
+                    <span className="hidden lg:inline">Xóa toàn bộ</span>
+                  </button>
+
+                  <div className="h-6 w-px bg-slate-200 mx-1 hidden sm:block"></div>
+
+                  {/* Báo cáo Biến động TTHC (Sửa đổi, bổ sung, bãi bỏ theo Tháng, Quý) */}
+                  <button
+                    type="button"
+                    onClick={() => setIsBienDongModalOpen(true)}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-95"
+                    title="Tổng hợp báo cáo danh mục TTHC Sửa đổi, Bổ sung, Bãi bỏ theo Tháng, Quý phục vụ kiểm soát TTHC"
+                    id="open-bien-dong-report-btn"
+                  >
+                    <FileBarChart2 className="w-4 h-4 text-amber-700" />
+                    <span className="hidden sm:inline">Báo cáo Sửa đổi / Bãi bỏ</span>
+                  </button>
+
+                  {/* Create Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!checkAdminPermission('Thêm thủ tục hành chính mới', () => {
+                        setEditingProcedure(null);
+                        setIsModalOpen(true);
+                      })) return;
+                      setEditingProcedure(null);
+                      setIsModalOpen(true);
+                    }}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-red-700 to-red-800 hover:from-red-800 hover:to-red-900 text-white rounded-lg text-xs font-bold shadow-md transition-all cursor-pointer hover:shadow-lg active:scale-95"
+                    id="add-new-procedure"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Thêm thủ tục</span>
+                  </button>
+                </>
               )}
 
-              {/* Delete Selected Button (visible when procedures are selected) */}
-              {selectedIds.size > 0 && (
-                <button
-                  type="button"
-                  onClick={handleDeleteSelected}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold shadow-sm transition-all cursor-pointer active:scale-95 animate-fadeIn"
-                  title={`Xóa ${selectedIds.size} thủ tục hành chính đã chọn`}
-                  id="toolbar-delete-selected"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  <span>Xóa đã chọn ({selectedIds.size})</span>
-                </button>
-              )}
-
-              {/* Delete All Procedures Button */}
-              <button
-                type="button"
-                onClick={handleDeleteAllProcedures}
-                disabled={procedures.length === 0}
-                className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
-                  procedures.length === 0
-                    ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-                    : 'bg-white hover:bg-rose-50 text-rose-700 border-rose-200 hover:border-rose-300'
-                }`}
-                title="Xóa toàn bộ thủ tục hành chính khỏi cơ sở dữ liệu"
-                id="delete-all-procedures-btn"
-              >
-                <Trash2 className="w-4 h-4 text-rose-600" />
-                <span className="hidden lg:inline">Xóa toàn bộ</span>
-              </button>
-
-              {/* Security Admin Panel button */}
+              {/* Security Admin Panel - Trigger button chỉ hiển thị khi đã đăng nhập Admin */}
               <AdminPanel
+                hideTriggerButton={!isAdminLoggedIn}
                 settings={settings}
                 onSaveSettings={handleSaveSettings}
                 linhVucPresets={linhVucPresets}
@@ -1349,38 +1394,6 @@ export default function App() {
                   setIsOnlineSpreadsheetOpen(true);
                 }}
               />
-
-              <div className="h-6 w-px bg-slate-200 mx-1 hidden sm:block"></div>
-
-              {/* Báo cáo Biến động TTHC (Sửa đổi, bổ sung, bãi bỏ theo Tháng, Quý) */}
-              <button
-                type="button"
-                onClick={() => setIsBienDongModalOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-95"
-                title="Tổng hợp báo cáo danh mục TTHC Sửa đổi, Bổ sung, Bãi bỏ theo Tháng, Quý phục vụ kiểm soát TTHC"
-                id="open-bien-dong-report-btn"
-              >
-                <FileBarChart2 className="w-4 h-4 text-amber-700" />
-                <span className="hidden sm:inline">Báo cáo Sửa đổi / Bãi bỏ</span>
-              </button>
-
-              {/* Create Button */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (!checkAdminPermission('Thêm thủ tục hành chính mới', () => {
-                    setEditingProcedure(null);
-                    setIsModalOpen(true);
-                  })) return;
-                  setEditingProcedure(null);
-                  setIsModalOpen(true);
-                }}
-                className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-red-700 to-red-800 hover:from-red-800 hover:to-red-900 text-white rounded-lg text-xs font-bold shadow-md transition-all cursor-pointer hover:shadow-lg active:scale-95"
-                id="add-new-procedure"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Thêm thủ tục</span>
-              </button>
 
             </div>
           </div>

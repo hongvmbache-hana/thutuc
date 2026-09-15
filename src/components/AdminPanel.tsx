@@ -62,6 +62,7 @@ interface AdminPanelProps {
   serverLastUpdated?: string | null;
   isServerSyncing?: boolean;
   onOpenOnlineSpreadsheet?: () => void;
+  hideTriggerButton?: boolean;
 }
 
 type AdminTab = 'system' | 'kiosk' | 'users' | 'categories' | 'data' | 'online_excel' | 'footer';
@@ -90,7 +91,8 @@ export default function AdminPanel({
   onPullFromServer,
   serverLastUpdated,
   isServerSyncing = false,
-  onOpenOnlineSpreadsheet
+  onOpenOnlineSpreadsheet,
+  hideTriggerButton = false
 }: AdminPanelProps) {
   const [username, setUsername] = useState(() => localStorage.getItem('tthc_admin_username') || '');
   const [password, setPassword] = useState('');
@@ -435,28 +437,30 @@ export default function AdminPanel({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => {
-          setIsOpen(true);
-          // Auto sync from current live settings
-          setSiteTitle(settings.siteTitle);
-          setSiteSubtitle(settings.siteSubtitle);
-          setLogoEmoji(settings.logoEmoji);
-          setBadgeLabel(settings.badgeLabel);
-          setSystemVersion(settings.systemVersion);
-          setFooterMainText(settings.footerMainText);
-          setFooterSubText(settings.footerSubText);
-          setOnlineExcelUrl(settings.onlineExcelUrl || '');
-          setOnlineExcelAutoSync(settings.onlineExcelAutoSync || false);
-          setOnlineExcelSyncMode(settings.onlineExcelSyncMode || 'merge');
-        }}
-        className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-900 text-amber-400 border border-slate-700 hover:border-amber-500 rounded-lg text-xs font-bold shadow-md transition-all cursor-pointer"
-        id="trigger-admin-panel"
-      >
-        <Lock className="w-3.5 h-3.5 text-amber-500" />
-        <span>⚙️ Trang quản trị Admin</span>
-      </button>
+      {!hideTriggerButton && (
+        <button
+          type="button"
+          onClick={() => {
+            setIsOpen(true);
+            // Auto sync from current live settings
+            setSiteTitle(settings.siteTitle);
+            setSiteSubtitle(settings.siteSubtitle);
+            setLogoEmoji(settings.logoEmoji);
+            setBadgeLabel(settings.badgeLabel);
+            setSystemVersion(settings.systemVersion);
+            setFooterMainText(settings.footerMainText);
+            setFooterSubText(settings.footerSubText);
+            setOnlineExcelUrl(settings.onlineExcelUrl || '');
+            setOnlineExcelAutoSync(settings.onlineExcelAutoSync || false);
+            setOnlineExcelSyncMode(settings.onlineExcelSyncMode || 'merge');
+          }}
+          className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-900 text-amber-400 border border-slate-700 hover:border-amber-500 rounded-lg text-xs font-bold shadow-md transition-all cursor-pointer"
+          id="trigger-admin-panel"
+        >
+          <Lock className="w-3.5 h-3.5 text-amber-500" />
+          <span>⚙️ Trang quản trị Admin</span>
+        </button>
+      )}
 
       {isOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4">

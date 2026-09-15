@@ -14,10 +14,12 @@ import {
   FileText,
   Volume2,
   Layers,
-  Palette
+  Palette,
+  MapPin
 } from 'lucide-react';
 import { AppSettings, Procedure } from '../types';
 import HanhChinhCongLogo from './HanhChinhCongLogo';
+import { QUANG_NINH_54_UNITS, getAgencyPresetOptions, QuangNinhUnit } from '../data/quangNinhUnits';
 
 interface KioskManagementTabProps {
   settings: AppSettings;
@@ -39,6 +41,8 @@ export default function KioskManagementTab({
   const [bannerBgColor, setBannerBgColor] = useState<'white' | 'red' | 'blue' | 'slate'>(
     settings.kioskBannerBgColor || 'white'
   );
+  const [selectedQnUnitId, setSelectedQnUnitId] = useState<string>('x_ba_che');
+  const [filterUnitType, setFilterUnitType] = useState<'all' | 'phuong' | 'xa' | 'dackhu'>('all');
   const [showStatsOnClock, setShowStatsOnClock] = useState<boolean>(
     settings.kioskShowStatsOnClock !== undefined ? settings.kioskShowStatsOnClock : true
   );
@@ -283,17 +287,111 @@ export default function KioskManagementTab({
               />
             </div>
 
-            <div className="space-y-1">
-              <label className="font-bold text-slate-700 uppercase tracking-wider block">
-                Tên Cơ quan / Đơn vị niêm yết (Tiêu đề phụ)
-              </label>
-              <input
-                type="text"
-                value={bannerSubtitle}
-                onChange={(e) => setBannerSubtitle(e.target.value)}
-                placeholder="TRUNG TÂM PHỤC VỤ HÀNH CHÍNH CÔNG XÃ BA CHẼ"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800 focus:bg-white focus:outline-none focus:border-red-600"
-              />
+            <div className="space-y-2.5 bg-red-50/40 p-3.5 rounded-xl border border-red-200/70">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                <label className="font-bold text-slate-800 uppercase tracking-wider text-xs flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4 text-red-700" />
+                  <span>Tên Cơ quan / Đơn vị niêm yết (Tiêu đề phụ Banner)</span>
+                </label>
+                <span className="text-[10.5px] font-bold text-red-700 bg-red-100/70 px-2 py-0.5 rounded-full border border-red-200 self-start sm:self-auto">
+                  54 Xã, Phường & Đặc khu Quảng Ninh
+                </span>
+              </div>
+
+              {/* Quang Ninh 54 Units Fast Selection Dropdown */}
+              <div className="space-y-2 bg-white p-3 rounded-lg border border-slate-200 shadow-2xs">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-[11px] font-bold text-slate-600">
+                    Chọn nhanh từ 54 đơn vị hành chính Quảng Ninh:
+                  </span>
+                  {/* Quick filter tabs */}
+                  <div className="flex items-center gap-1 text-[10px]">
+                    {[
+                      { id: 'all', label: 'Tất cả (54)' },
+                      { id: 'phuong', label: '30 Phường' },
+                      { id: 'xa', label: '22 Xã' },
+                      { id: 'dackhu', label: '2 Đặc khu' }
+                    ].map(tab => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setFilterUnitType(tab.id as any)}
+                        className={`px-2 py-0.5 rounded font-semibold cursor-pointer transition-colors ${
+                          filterUnitType === tab.id
+                            ? 'bg-red-700 text-white shadow-2xs'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <select
+                      value={selectedQnUnitId}
+                      onChange={(e) => {
+                        const unitId = e.target.value;
+                        setSelectedQnUnitId(unitId);
+                        const found = QUANG_NINH_54_UNITS.find(u => u.id === unitId);
+                        if (found) {
+                          setBannerSubtitle(found.agencyName);
+                        }
+                      }}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-800 focus:bg-white focus:outline-none focus:border-red-600 cursor-pointer"
+                    >
+                      {QUANG_NINH_54_UNITS
+                        .filter(u => filterUnitType === 'all' || u.type === filterUnitType)
+                        .map(unit => (
+                          <option key={unit.id} value={unit.id}>
+                            {unit.name} ({unit.type === 'phuong' ? 'Phường' : unit.type === 'xa' ? 'Xã' : 'Đặc khu'})
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+
+                  {/* Preset formatting options for currently selected unit */}
+                  {(() => {
+                    const currentUnit = QUANG_NINH_54_UNITS.find(u => u.id === selectedQnUnitId);
+                    if (!currentUnit) return null;
+                    const presets = getAgencyPresetOptions(currentUnit);
+                    return (
+                      <select
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            setBannerSubtitle(e.target.value);
+                          }
+                        }}
+                        defaultValue=""
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-[11px] font-semibold text-slate-700 focus:bg-white focus:outline-none focus:border-red-600 cursor-pointer"
+                      >
+                        <option value="" disabled>-- Mẫu định dạng tên cơ quan --</option>
+                        {presets.map((preset, idx) => (
+                          <option key={idx} value={preset}>
+                            {preset}
+                          </option>
+                        ))}
+                      </select>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* Direct text input for full customizability */}
+              <div>
+                <span className="text-[11px] text-slate-500 font-medium block mb-1">
+                  Giá trị áp dụng thực tế trên Banner (người dùng có thể sửa đổi tùy ý):
+                </span>
+                <input
+                  type="text"
+                  value={bannerSubtitle}
+                  onChange={(e) => setBannerSubtitle(e.target.value)}
+                  placeholder="TRUNG TÂM PHỤC VỤ HÀNH CHÍNH CÔNG XÃ BA CHẼ"
+                  className="w-full px-3 py-2 bg-white border border-red-300 focus:border-red-600 rounded-lg font-bold text-slate-900 focus:outline-none shadow-2xs text-xs sm:text-sm"
+                />
+              </div>
             </div>
 
             <div className="space-y-1">

@@ -34,6 +34,7 @@ import {
 import QRCode from 'qrcode';
 import { Procedure, AppSettings, NiemYetConfig, DEFAULT_NIEM_YET_CONFIG } from '../types';
 import HanhChinhCongLogo from './HanhChinhCongLogo';
+import { QUANG_NINH_54_UNITS, getAgencyPresetOptions } from '../data/quangNinhUnits';
 
 interface NiemYetBoardProps {
   procedures: Procedure[];
@@ -154,6 +155,8 @@ export default function NiemYetBoard({
   const [selectedProcedureForQr, setSelectedProcedureForQr] = useState<Procedure | null>(null);
   const [qrCodeModalDataUrl, setQrCodeModalDataUrl] = useState<string>('');
   const [previewDetailProcedure, setPreviewDetailProcedure] = useState<Procedure | null>(null);
+  const [selectedQnUnitId, setSelectedQnUnitId] = useState<string>('x_ba_che');
+  const [filterUnitType, setFilterUnitType] = useState<'all' | 'phuong' | 'xa' | 'dackhu'>('all');
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -1519,15 +1522,107 @@ export default function NiemYetBoard({
                     <span className="font-bold text-red-700 not-italic">{config.displayTitle || 'BẢNG NIÊM YẾT THỦ TỤC HÀNH CHÍNH'}</span>
                   </div>
                 </div>
-                <div>
-                  <span className="text-[11px] text-slate-500 block mb-1">Tên cơ quan / đơn vị niêm yết:</span>
-                  <input
-                    type="text"
-                    value={config.subTitle}
-                    onChange={(e) => saveConfig({ ...config, subTitle: e.target.value })}
-                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-bold"
-                    placeholder="TRUNG TÂM PHỤC VỤ HÀNH CHÍNH CÔNG XÃ BA CHẼ"
-                  />
+                <div className="space-y-2 bg-red-50/40 p-3 rounded-lg border border-red-200">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <span className="text-xs font-bold text-slate-800">
+                      Tên cơ quan / đơn vị niêm yết (Tiêu đề phụ):
+                    </span>
+                    <span className="text-[10px] font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded-full border border-red-200 self-start sm:self-auto">
+                      54 Xã, Phường & Đặc khu Quảng Ninh
+                    </span>
+                  </div>
+
+                  {/* Fast Selector for 54 administrative units */}
+                  <div className="space-y-1.5 bg-white p-2.5 rounded-md border border-slate-200">
+                    <div className="flex flex-wrap items-center justify-between gap-1.5">
+                      <span className="text-[11px] font-semibold text-slate-600">
+                        Chọn nhanh đơn vị hành chính Quảng Ninh:
+                      </span>
+                      <div className="flex items-center gap-1 text-[10px]">
+                        {[
+                          { id: 'all', label: 'Tất cả (54)' },
+                          { id: 'phuong', label: '30 Phường' },
+                          { id: 'xa', label: '22 Xã' },
+                          { id: 'dackhu', label: '2 Đặc khu' }
+                        ].map(tab => (
+                          <button
+                            key={tab.id}
+                            type="button"
+                            onClick={() => setFilterUnitType(tab.id as any)}
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-semibold cursor-pointer transition-colors ${
+                              filterUnitType === tab.id
+                                ? 'bg-red-700 text-white'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            {tab.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                      <select
+                        value={selectedQnUnitId}
+                        onChange={(e) => {
+                          const unitId = e.target.value;
+                          setSelectedQnUnitId(unitId);
+                          const found = QUANG_NINH_54_UNITS.find(u => u.id === unitId);
+                          if (found) {
+                            saveConfig({ ...config, subTitle: found.agencyName });
+                          }
+                        }}
+                        className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-800 focus:bg-white focus:outline-none focus:border-red-600 cursor-pointer"
+                      >
+                        {QUANG_NINH_54_UNITS
+                          .filter(u => filterUnitType === 'all' || u.type === filterUnitType)
+                          .map(unit => (
+                            <option key={unit.id} value={unit.id}>
+                              {unit.name} ({unit.type === 'phuong' ? 'Phường' : unit.type === 'xa' ? 'Xã' : 'Đặc khu'})
+                            </option>
+                          ))}
+                      </select>
+
+                      {/* Formatting presets for selected unit */}
+                      {(() => {
+                        const currentUnit = QUANG_NINH_54_UNITS.find(u => u.id === selectedQnUnitId);
+                        if (!currentUnit) return null;
+                        const presets = getAgencyPresetOptions(currentUnit);
+                        return (
+                          <select
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                saveConfig({ ...config, subTitle: e.target.value });
+                              }
+                            }}
+                            defaultValue=""
+                            className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-[11px] font-semibold text-slate-700 focus:bg-white focus:outline-none focus:border-red-600 cursor-pointer"
+                          >
+                            <option value="" disabled>-- Chọn mẫu định dạng tên --</option>
+                            {presets.map((preset, idx) => (
+                              <option key={idx} value={preset}>
+                                {preset}
+                              </option>
+                            ))}
+                          </select>
+                        );
+                      })()}
+                    </div>
+                  </div>
+
+                  {/* Manual / custom edit input */}
+                  <div>
+                    <span className="text-[10.5px] text-slate-500 block mb-1">
+                      Nội dung hiển thị trên banner (có thể chỉnh sửa trực tiếp):
+                    </span>
+                    <input
+                      type="text"
+                      value={config.subTitle}
+                      onChange={(e) => saveConfig({ ...config, subTitle: e.target.value })}
+                      className="w-full px-3 py-1.5 border border-red-300 focus:border-red-600 rounded-lg text-xs font-bold bg-white text-slate-900 focus:outline-none"
+                      placeholder="TRUNG TÂM PHỤC VỤ HÀNH CHÍNH CÔNG XÃ BA CHẼ"
+                    />
+                  </div>
                 </div>
               </div>
 
