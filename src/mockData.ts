@@ -8,7 +8,16 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   badgeLabel: 'DỮ LIỆU ĐỒNG BỘ',
   systemVersion: 'v2.6.4',
   footerMainText: '© 2026 Bản quyền thuộc Cổng thông tin điều chế & quản lý dữ liệu Thủ tục Hành chính.',
-  footerSubText: 'Phục vụ công tác chuyển đổi số cấp cơ sở và nâng cao chỉ số cải cách hành chính (PAR INDEX).'
+  footerSubText: 'Phục vụ công tác chuyển đổi số cấp cơ sở và nâng cao chỉ số cải cách hành chính (PAR INDEX).',
+  kioskBannerTitle: 'BẢNG NIÊM YẾT THỦ TỤC HÀNH CHÍNH',
+  kioskBannerSubtitle: 'TRUNG TÂM PHỤC VỤ HÀNH CHÍNH CÔNG XÃ BA CHẼ',
+  kioskBannerSlogan: 'Chuyên nghiệp - Minh bạch - Kịp thời - Hiệu quả',
+  kioskBannerBgColor: 'white',
+  kioskShowStatsOnClock: true,
+  kioskFooterText: 'Dùng Camera điện thoại hoặc Zalo quét mã QR trên từng thẻ để tra cứu toàn văn và nộp hồ sơ trực tuyến',
+  kioskFooterMarquee: 'Chào mừng Quý công dân và Doanh nghiệp đến giao dịch tại Bộ phận Tiếp nhận và Trả kết quả!',
+  kioskFooterHotline: '0203.3888.222 / 1900.9095',
+  kioskFooterShowMarquee: true
 };
 
 export const INITIAL_PROCEDURES: Procedure[] = allProceduresJson as Procedure[];

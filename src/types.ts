@@ -32,6 +32,21 @@ export interface SearchFilters {
   trangThai: 'all' | 'Sửa đổi, bổ sung' | 'Bãi bỏ' | 'Ban hành mới' | 'Hiện hành';
 }
 
+export type UserRole = 'admin' | 'editor' | 'viewer';
+
+export interface UserAccount {
+  id: string;
+  username: string;
+  fullName: string;
+  email?: string;
+  phone?: string;
+  role: UserRole; // 'admin': Quản trị viên tối cao, 'editor': Cán bộ nghiệp vụ (Thêm, Sửa, Xóa TTHC), 'viewer': Cán bộ tra cứu
+  password?: string;
+  isActive: boolean;
+  createdAt: string;
+  lastLogin?: string;
+}
+
 export interface AppSettings {
   siteTitle: string;
   siteSubtitle: string;
@@ -45,6 +60,17 @@ export interface AppSettings {
   onlineExcelSyncMode?: 'merge' | 'add_only' | 'replace_all'; // Chế độ đồng bộ mặc định
   lastOnlineSyncDate?: string; // Thời điểm đồng bộ gần nhất
   lastOnlineSyncCount?: number; // Số lượng thủ tục đã đồng bộ lần gần nhất
+  // Cấu hình Banner Kiosk
+  kioskBannerTitle?: string;
+  kioskBannerSubtitle?: string;
+  kioskBannerSlogan?: string;
+  kioskBannerBgColor?: 'white' | 'red' | 'blue' | 'slate';
+  kioskShowStatsOnClock?: boolean; // Hiển thị số thủ tục cấp tỉnh, xã, liên thông, toàn trình/một phần cạnh trên đồng hồ
+  // Cấu hình Footer Kiosk
+  kioskFooterText?: string;
+  kioskFooterMarquee?: string;
+  kioskFooterHotline?: string;
+  kioskFooterShowMarquee?: boolean;
 }
 
 export interface OnlineExcelSyncResult {

@@ -157,6 +157,35 @@ export default function NiemYetBoard({
 
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Live procedure statistics for Kiosk Header (cạnh trên đồng hồ: cấp tỉnh, xã, liên thông, toàn trình/một phần)
+  const kioskStats = useMemo(() => {
+    let capTinh = 0;
+    let capXa = 0;
+    let lienThong = 0;
+    let toanTrinh = 0;
+    let motPhan = 0;
+
+    procedures.forEach(p => {
+      const cap = (p.capThucHien || '').toLowerCase().trim();
+      if (cap.includes('tỉnh')) capTinh++;
+      if (cap.includes('xã')) capXa++;
+      if (cap.includes('liên thông') || (p.soNganh && p.soNganh.toLowerCase().includes('liên thông'))) lienThong++;
+
+      const dvctt = (p.dvcttLoai || '').trim();
+      if (dvctt === 'Toàn trình') toanTrinh++;
+      else if (dvctt === 'Một phần') motPhan++;
+    });
+
+    return {
+      capTinh,
+      capXa,
+      lienThong,
+      toanTrinh,
+      motPhan,
+      total: procedures.length
+    };
+  }, [procedures]);
+
   // Live Digital Clock
   useEffect(() => {
     const updateTime = () => {
@@ -384,79 +413,160 @@ export default function NiemYetBoard({
       }`}
       id="niem-yet-board-container"
     >
-      {/* ================= 1. HEADER SECTION (Exact match with user image) ================= */}
-      <header className="bg-white border-b-4 border-amber-400 shadow-sm px-4 sm:px-6 py-3.5 select-none shrink-0 print:hidden">
-        <div className="max-w-[1700px] mx-auto flex items-center justify-between gap-3">
+      {/* ================= 1. HEADER SECTION (Exact match with user image + Kiosk customization) ================= */}
+      <header className={`border-b-4 border-amber-400 shadow-sm px-4 sm:px-6 py-3 select-none shrink-0 print:hidden transition-colors ${
+        settings.kioskBannerBgColor === 'red'
+          ? 'bg-[#b91c1c] text-white'
+          : settings.kioskBannerBgColor === 'blue'
+            ? 'bg-[#1e3a8a] text-white'
+            : settings.kioskBannerBgColor === 'slate'
+              ? 'bg-[#0f172a] text-white'
+              : 'bg-white text-slate-800'
+      }`}>
+        <div className="max-w-[1700px] mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3">
           
           {/* Left: Emblem & Titles */}
           <div className="flex items-center gap-3.5">
             {/* Official Vietnam Public Administrative Service Logo */}
             <div className="shrink-0 flex items-center justify-center">
-              <HanhChinhCongLogo size={52} className="hover:scale-105 transition-transform drop-shadow-md" />
+              <HanhChinhCongLogo size={54} className="hover:scale-105 transition-transform drop-shadow-md" />
             </div>
 
             <div>
               <h1 
-                className="text-lg sm:text-2xl md:text-[26px] font-bold tracking-tight text-[#c51f24] uppercase leading-tight font-times select-text"
+                className={`text-lg sm:text-2xl md:text-[25px] font-bold tracking-tight uppercase leading-tight font-times select-text ${
+                  settings.kioskBannerBgColor && settings.kioskBannerBgColor !== 'white' ? 'text-white' : 'text-[#c51f24]'
+                }`}
                 style={{ fontFamily: '"Times New Roman", Times, "Tinos", serif' }}
               >
-                {config.displayTitle || 'BẢNG NIÊM YẾT THỦ TỤC HÀNH CHÍNH'}
+                {settings.kioskBannerTitle || config.displayTitle || 'BẢNG NIÊM YẾT THỦ TỤC HÀNH CHÍNH'}
               </h1>
               <p 
-                className="text-xs sm:text-sm font-bold text-slate-800 uppercase tracking-wide mt-0.5 font-times select-text"
+                className={`text-xs sm:text-sm font-bold uppercase tracking-wide mt-0.5 font-times select-text ${
+                  settings.kioskBannerBgColor && settings.kioskBannerBgColor !== 'white' ? 'text-amber-300' : 'text-slate-800'
+                }`}
                 style={{ fontFamily: '"Times New Roman", Times, "Tinos", serif' }}
               >
-                {config.subTitle || 'TRUNG TÂM PHỤC VỤ HÀNH CHÍNH CÔNG XÃ BA CHẼ'}
+                {settings.kioskBannerSubtitle || config.subTitle || 'TRUNG TÂM PHỤC VỤ HÀNH CHÍNH CÔNG XÃ BA CHẼ'}
               </p>
+              {settings.kioskBannerSlogan && (
+                <p className={`text-[11px] font-medium italic mt-0.5 select-text ${
+                  settings.kioskBannerBgColor && settings.kioskBannerBgColor !== 'white' ? 'text-slate-200' : 'text-slate-500'
+                }`}>
+                  {settings.kioskBannerSlogan}
+                </p>
+              )}
             </div>
           </div>
 
-          {/* Right: Digital Clock, Contrast Toggle, Settings Button */}
-          <div className="flex items-center gap-3">
-            {/* Live Red Clock as in image */}
-            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 bg-red-50/70 border border-red-200 rounded-lg">
-              <Clock className="w-4 h-4 text-[#c51f24]" />
-              <span className="font-mono font-bold text-base text-[#c51f24] tracking-wider">
-                {currentTime || '10:16:05'}
-              </span>
-            </div>
+          {/* Right: Digital Clock & Procedure Statistics strictly above the clock */}
+          <div className="flex flex-col items-start md:items-end gap-1.5 shrink-0">
+            {/* User Request: "cạnh trên đồng hồ ở banner kiosk hiện số thủ tục cấp tỉnh, xã, liên thông, toàn trình/một phần" */}
+            {(settings.kioskShowStatsOnClock !== false) && (
+              <div 
+                className="flex items-center flex-wrap gap-1.5 text-[11px] font-bold select-none"
+                id="kiosk-stats-above-clock"
+              >
+                <div 
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded-md border shadow-xs transition-colors ${
+                    settings.kioskBannerBgColor && settings.kioskBannerBgColor !== 'white'
+                      ? 'bg-blue-950/80 text-blue-200 border-blue-400/40'
+                      : 'bg-blue-50 text-blue-900 border-blue-200'
+                  }`}
+                  title="Tổng số thủ tục hành chính thuộc thẩm quyền Cấp tỉnh"
+                >
+                  <span className="opacity-90 font-medium">Cấp tỉnh:</span>
+                  <span className="font-mono font-black px-1 rounded bg-blue-600 text-white text-[11.5px]">{kioskStats.capTinh}</span>
+                </div>
 
-            {/* High Contrast / Dark toggle */}
-            <button
-              type="button"
-              onClick={() => setIsHighContrast(!isHighContrast)}
-              className="p-2 rounded-lg hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer border border-slate-200"
-              title="Chuyển đổi chế độ tương phản cao cho người cao tuổi / khiếm thị"
-              id="kiosk-contrast-toggle"
-            >
-              <div className="w-5 h-5 rounded-full border-2 border-slate-700 overflow-hidden flex">
-                <div className="w-1/2 h-full bg-slate-800"></div>
-                <div className="w-1/2 h-full bg-white"></div>
+                <div 
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded-md border shadow-xs transition-colors ${
+                    settings.kioskBannerBgColor && settings.kioskBannerBgColor !== 'white'
+                      ? 'bg-emerald-950/80 text-emerald-200 border-emerald-400/40'
+                      : 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                  }`}
+                  title="Tổng số thủ tục hành chính thuộc thẩm quyền Cấp xã"
+                >
+                  <span className="opacity-90 font-medium">Cấp xã:</span>
+                  <span className="font-mono font-black px-1 rounded bg-emerald-600 text-white text-[11.5px]">{kioskStats.capXa}</span>
+                </div>
+
+                <div 
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded-md border shadow-xs transition-colors ${
+                    settings.kioskBannerBgColor && settings.kioskBannerBgColor !== 'white'
+                      ? 'bg-amber-950/80 text-amber-200 border-amber-400/40'
+                      : 'bg-amber-50 text-amber-900 border-amber-200'
+                  }`}
+                  title="Tổng số thủ tục hành chính Liên thông"
+                >
+                  <span className="opacity-90 font-medium">Liên thông:</span>
+                  <span className="font-mono font-black px-1 rounded bg-amber-600 text-white text-[11.5px]">{kioskStats.lienThong}</span>
+                </div>
+
+                <div 
+                  className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md border shadow-xs transition-colors ${
+                    settings.kioskBannerBgColor && settings.kioskBannerBgColor !== 'white'
+                      ? 'bg-purple-950/80 text-purple-200 border-purple-400/40'
+                      : 'bg-teal-50 text-teal-900 border-teal-200'
+                  }`}
+                  title="Dịch vụ công trực tuyến: Toàn trình và Một phần"
+                >
+                  <span className="opacity-90 font-medium">Toàn trình:</span>
+                  <span className="font-mono font-black px-1 rounded bg-teal-600 text-white text-[11.5px]">{kioskStats.toanTrinh}</span>
+                  <span className="opacity-40">/</span>
+                  <span className="opacity-90 font-medium">Một phần:</span>
+                  <span className="font-mono font-black px-1 rounded bg-sky-600 text-white text-[11.5px]">{kioskStats.motPhan}</span>
+                </div>
               </div>
-            </button>
+            )}
 
-            {/* Kiosk Fullscreen toggle */}
-            <button
-              type="button"
-              onClick={toggleFullscreen}
-              className="p-2 rounded-lg hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer border border-slate-200 hidden md:flex items-center justify-center"
-              title={isFullscreen ? 'Thoát toàn màn hình' : 'Chế độ toàn màn hình Kiosk'}
-              id="kiosk-fullscreen-toggle"
-            >
-              {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
-            </button>
+            {/* Bottom row: Digital Clock, Contrast Toggle, Fullscreen Toggle, Settings Button */}
+            <div className="flex items-center gap-2.5">
+              {/* Live Red Clock as in image */}
+              <div className="flex items-center gap-1.5 px-3 py-1 bg-red-50 border border-red-200 rounded-lg shadow-xs">
+                <Clock className="w-4 h-4 text-[#c51f24]" />
+                <span className="font-mono font-bold text-base text-[#c51f24] tracking-wider">
+                  {currentTime || '10:16:05'}
+                </span>
+              </div>
 
-            {/* Config Button (Yellow with Gear as in photo) */}
-            <button
-              type="button"
-              onClick={() => setIsConfigModalOpen(true)}
-              className="bg-amber-400 hover:bg-amber-500 active:scale-95 text-slate-900 p-2 sm:px-3.5 sm:py-2 rounded-lg font-bold text-xs shadow-xs border border-amber-500 transition-all flex items-center gap-1.5 cursor-pointer"
-              title="Cấu hình cách phân chia và giao diện hiển thị bảng niêm yết"
-              id="open-niemyet-config-btn"
-            >
-              <SlidersHorizontal className="w-4 h-4" />
-              <span className="hidden sm:inline">Cấu hình</span>
-            </button>
+              {/* High Contrast / Dark toggle */}
+              <button
+                type="button"
+                onClick={() => setIsHighContrast(!isHighContrast)}
+                className="p-2 rounded-lg hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer border border-slate-200 bg-white"
+                title="Chuyển đổi chế độ tương phản cao cho người cao tuổi / khiếm thị"
+                id="kiosk-contrast-toggle"
+              >
+                <div className="w-5 h-5 rounded-full border-2 border-slate-700 overflow-hidden flex">
+                  <div className="w-1/2 h-full bg-slate-800"></div>
+                  <div className="w-1/2 h-full bg-white"></div>
+                </div>
+              </button>
+
+              {/* Kiosk Fullscreen toggle */}
+              <button
+                type="button"
+                onClick={toggleFullscreen}
+                className="p-2 rounded-lg hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer border border-slate-200 hidden md:flex items-center justify-center bg-white"
+                title={isFullscreen ? 'Thoát toàn màn hình' : 'Chế độ toàn màn hình Kiosk'}
+                id="kiosk-fullscreen-toggle"
+              >
+                {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+              </button>
+
+              {/* Config Button (Yellow with Gear as in photo) */}
+              <button
+                type="button"
+                onClick={() => setIsConfigModalOpen(true)}
+                className="bg-amber-400 hover:bg-amber-500 active:scale-95 text-slate-900 px-3.5 py-2 rounded-lg font-bold text-xs shadow-xs border border-amber-500 transition-all flex items-center gap-1.5 cursor-pointer"
+                title="Cấu hình cách phân chia và giao diện hiển thị bảng niêm yết"
+                id="open-niemyet-config-btn"
+              >
+                <SlidersHorizontal className="w-4 h-4" />
+                <span className="hidden sm:inline">Cấu hình</span>
+              </button>
+            </div>
           </div>
 
         </div>
@@ -1014,6 +1124,47 @@ export default function NiemYetBoard({
         )}
 
       </main>
+
+      {/* ================= 4. KIOSK FOOTER BAR (Quản lý Banner, Footer Kiosk) ================= */}
+      <footer 
+        className="bg-slate-900 text-slate-300 border-t-2 border-amber-500 py-2.5 px-4 sm:px-6 shrink-0 print:hidden select-none text-xs"
+        id="kiosk-footer-container"
+      >
+        <div className="max-w-[1700px] mx-auto flex flex-col md:flex-row items-center justify-between gap-2.5">
+          {/* Left: Guidance / Instructions */}
+          <div className="flex items-center gap-2 text-slate-200">
+            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-400 text-slate-950 font-black text-[11px] shrink-0">
+              i
+            </span>
+            <p className="font-medium text-[11.5px] leading-tight">
+              {settings.kioskFooterText || 'Dùng Camera điện thoại hoặc Zalo quét mã QR trên từng thẻ để tra cứu toàn văn và nộp hồ sơ trực tuyến.'}
+            </p>
+          </div>
+
+          {/* Center: Marquee ticker text */}
+          {(settings.kioskFooterShowMarquee !== false) && (
+            <div className="hidden lg:flex items-center gap-2 max-w-xl flex-1 px-4 overflow-hidden">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0"></span>
+              <div className="truncate text-amber-300/90 font-medium text-[11px]">
+                {settings.kioskFooterMarquee || 'Chào mừng Quý công dân và Doanh nghiệp đến giao dịch tại Bộ phận Tiếp nhận và Trả kết quả!'}
+              </div>
+            </div>
+          )}
+
+          {/* Right: Hotline & Contact */}
+          <div className="flex items-center gap-3 shrink-0 text-[11.5px]">
+            {settings.kioskFooterHotline && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-800 rounded-lg border border-slate-700 text-amber-300 font-bold">
+                <Phone className="w-3.5 h-3.5 text-amber-400" />
+                <span>Đường dây nóng:</span>
+                <span className="font-mono text-white">{settings.kioskFooterHotline}</span>
+              </div>
+            )}
+            <span className="text-slate-600 hidden sm:inline">|</span>
+            <span className="text-slate-400 font-medium">Hệ thống Kiosk Tra cứu TTHC thông minh</span>
+          </div>
+        </div>
+      </footer>
 
       {/* ================= 5. PAKN (PHẢN ÁNH KIẾN NGHỊ) GUIDANCE MODAL ================= */}
       {isPaknModalOpen && (

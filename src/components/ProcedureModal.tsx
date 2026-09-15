@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Procedure, SearchFilters } from '../types';
-import { X, Save, HelpCircle, RefreshCw, Layers, QrCode } from 'lucide-react';
+import { X, Save, HelpCircle, RefreshCw, Layers, QrCode, Lock } from 'lucide-react';
 
 interface ProcedureModalProps {
   isOpen: boolean;
@@ -10,6 +10,8 @@ interface ProcedureModalProps {
   linhVucPresets: string[];
   soNganhPresets: string[];
   capThucHienPresets: string[];
+  isAdminLoggedIn?: boolean;
+  onRequireAdminLogin?: () => void;
 }
 
 export default function ProcedureModal({
@@ -19,7 +21,9 @@ export default function ProcedureModal({
   procedureToEdit,
   linhVucPresets,
   soNganhPresets,
-  capThucHienPresets
+  capThucHienPresets,
+  isAdminLoggedIn = true,
+  onRequireAdminLogin
 }: ProcedureModalProps) {
   
   const [formData, setFormData] = useState<Partial<Procedure>>({
@@ -118,8 +122,9 @@ export default function ProcedureModal({
       tempErrors.soNganh = 'Vui lòng chọn hoặc nhập bộ, ngành chịu trách nhiệm';
     }
 
+    // Default căn cứ pháp lý if empty instead of failing
     if (!formData.canCuPhapLy?.trim()) {
-      tempErrors.canCuPhapLy = 'Vui lòng nhập căn cứ pháp lý cốt lõi';
+      formData.canCuPhapLy = 'Quy định pháp luật hiện hành';
     }
 
     setErrors(tempErrors);
@@ -128,25 +133,32 @@ export default function ProcedureModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isAdminLoggedIn) {
+      if (onRequireAdminLogin) onRequireAdminLogin();
+      return;
+    }
     if (!validateForm()) return;
 
     const finalLinhVuc = customLinhVuc ? customLinhVucVal.trim() : formData.linhVuc;
     const finalSoNganh = customSoNganh ? customSoNganhVal.trim() : formData.soNganh;
 
     const finalData: Procedure = {
-      id: procedureToEdit?.id || `tthc-${Date.now()}`,
+      id: procedureToEdit?.id || `tthc-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       maTthc: formData.maTthc!.trim(),
       tenTthc: formData.tenTthc!.trim(),
-      linhVuc: finalLinhVuc!,
-      soNganh: finalSoNganh!,
-      capThucHien: formData.capThucHien!,
+      linhVuc: finalLinhVuc || 'Khác',
+      soNganh: finalSoNganh || 'UBND Xã Ba Chẽ',
+      capThucHien: formData.capThucHien || 'Cấp xã',
       bcciTiepNhan: !!formData.bcciTiepNhan,
       bcciTraKetQua: !!formData.bcciTraKetQua,
-      dvcttLoai: formData.dvcttLoai!,
+      dvcttLoai: formData.dvcttLoai || 'Toàn trình',
       motCua: !!formData.motCua,
-      canCuPhapLy: formData.canCuPhapLy!.trim(),
+      canCuPhapLy: formData.canCuPhapLy?.trim() || 'Quy định pháp luật hiện hành',
       dungChung: !!formData.dungChung,
       ghiChu: formData.ghiChu?.trim() || '',
+      trangThai: formData.trangThai || 'Hiện hành',
+      soQuyetDinh: formData.soQuyetDinh?.trim() || '',
+      ngayBanHanh: formData.ngayBanHanh?.trim() || '',
       ngayTao: procedureToEdit?.ngayTao || new Date().toISOString(),
       ngayCapNhat: new Date().toISOString()
     };
@@ -167,9 +179,16 @@ export default function ProcedureModal({
             <span className="p-1.5 bg-red-100 text-red-800 rounded-lg">
               <Layers className="w-5 h-5" />
             </span>
-            <h2 className="text-lg font-bold text-slate-800" id="modal-title">
-              {procedureToEdit ? 'CẬP NHẬT THỦ TỤC HÀNH CHÍNH' : 'THÊM THỦ TỤC HÀNH CHÍNH MỚI'}
-            </h2>
+            <div>
+              <h2 className="text-lg font-bold text-slate-800" id="modal-title">
+                {procedureToEdit ? 'CẬP NHẬT THỦ TỤC HÀNH CHÍNH' : 'THÊM THỦ TỤC HÀNH CHÍNH MỚI'}
+              </h2>
+              {!isAdminLoggedIn && (
+                <span className="text-[11px] text-amber-700 font-semibold flex items-center gap-1 mt-0.5">
+                  <Lock className="w-3 h-3 text-amber-600" /> Chế độ chỉ đọc (Cần đăng nhập quản trị viên để lưu)
+                </span>
+              )}
+            </div>
           </div>
           <button
             type="button"
@@ -180,6 +199,28 @@ export default function ProcedureModal({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Admin Permission Warning Banner */}
+        {!isAdminLoggedIn && (
+          <div className="bg-amber-50 border-b border-amber-200 px-6 py-2.5 flex items-center justify-between gap-3 text-amber-900 text-xs">
+            <div className="flex items-center gap-2">
+              <Lock className="w-4 h-4 text-amber-600 shrink-0" />
+              <span><strong>Chỉ đọc:</strong> Bạn cần đăng nhập tài khoản Quản trị viên để có quyền Thêm mới hoặc Lưu sửa đổi.</span>
+            </div>
+            {onRequireAdminLogin && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onRequireAdminLogin();
+                }}
+                className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded text-[11px] shrink-0 cursor-pointer shadow-xs"
+              >
+                Đăng nhập Quản trị
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Modal Body Form */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4" id="procedure-form">
@@ -494,25 +535,51 @@ export default function ProcedureModal({
         </form>
 
         {/* Modal Footer Controls */}
-        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-2 shrink-0">
-          <button
-            type="button"
-            className="px-4 py-2 text-xs font-bold border border-slate-200 rounded-lg text-slate-500 bg-white hover:bg-slate-50 transition-colors"
-            onClick={onClose}
-            id="cancel-modal"
-          >
-            Hủy bỏ
-          </button>
+        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-2 shrink-0">
+          <div>
+            {!isAdminLoggedIn && (
+              <span className="text-xs text-red-700 font-bold flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5" />
+                Cần đăng nhập Quản trị viên để lưu
+              </span>
+            )}
+          </div>
           
-          <button
-            type="submit"
-            form="procedure-form"
-            className="flex items-center gap-1.5 px-4.5 py-2 bg-red-700 hover:bg-red-800 text-white text-xs font-bold rounded-lg shadow-md transition-colors"
-            id="save-procedure-button"
-          >
-            <Save className="w-4 h-4" />
-            <span>Lưu thông tin</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="px-4 py-2 text-xs font-bold border border-slate-200 rounded-lg text-slate-500 bg-white hover:bg-slate-50 transition-colors"
+              onClick={onClose}
+              id="cancel-modal"
+            >
+              Đóng
+            </button>
+            
+            {isAdminLoggedIn ? (
+              <button
+                type="submit"
+                form="procedure-form"
+                className="flex items-center gap-1.5 px-4.5 py-2 bg-red-700 hover:bg-red-800 text-white text-xs font-bold rounded-lg shadow-md transition-colors cursor-pointer"
+                id="save-procedure-button"
+              >
+                <Save className="w-4 h-4" />
+                <span>{procedureToEdit ? 'Lưu cập nhật' : 'Thêm thủ tục'}</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  if (onRequireAdminLogin) onRequireAdminLogin();
+                }}
+                className="flex items-center gap-1.5 px-4.5 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg shadow-md transition-colors cursor-pointer"
+                id="save-procedure-button-login"
+              >
+                <Lock className="w-4 h-4" />
+                <span>Đăng nhập Quản trị để Lưu</span>
+              </button>
+            )}
+          </div>
         </div>
 
       </div>

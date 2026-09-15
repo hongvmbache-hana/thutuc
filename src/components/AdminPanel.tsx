@@ -27,10 +27,15 @@ import {
   Calendar,
   Layers,
   Link2,
-  CheckCheck
+  CheckCheck,
+  Users,
+  Monitor
 } from 'lucide-react';
 import { Procedure, AppSettings, OnlineExcelSyncResult } from '../types';
 import { fetchOnlineSpreadsheet, parseSpreadsheetBuffer, formatOnlineExcelUrl } from '../utils/onlineExcelSync';
+import { authenticateUser } from '../utils/userManagement';
+import UserManagementTab from './UserManagementTab';
+import KioskManagementTab from './KioskManagementTab';
 
 interface AdminPanelProps {
   settings: AppSettings;
@@ -59,7 +64,7 @@ interface AdminPanelProps {
   onOpenOnlineSpreadsheet?: () => void;
 }
 
-type AdminTab = 'system' | 'categories' | 'data' | 'online_excel' | 'footer';
+type AdminTab = 'system' | 'kiosk' | 'users' | 'categories' | 'data' | 'online_excel' | 'footer';
 
 export default function AdminPanel({
   settings,
@@ -124,13 +129,54 @@ export default function AdminPanel({
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    const isHongvm = username === 'Hongvm' && password === 'Vungochan@2015';
-    const isNguyenVanA = username === 'NguyenVanA' && password === 'nguyenvana@2026';
+    const cleanUser = username.trim();
+    const cleanPass = password.trim();
 
-    if (isHongvm || isNguyenVanA) {
+    // 1. Authenticate against User Management store
+    const auth = authenticateUser(cleanUser, cleanPass);
+    if (auth.success && auth.user) {
+      if (auth.user.role !== 'admin') {
+        setErrorMsg('Tài khoản của bạn thuộc vai trò Cán bộ nhưng không có quyền Quản trị tối cao (Chỉ Admin mới được vào Quản trị hệ thống).');
+        onShowToast('Tài khoản không có quyền truy cập Ban Quản Trị hệ thống.', 'error');
+        return;
+      }
+
       setIsAuthorized(true);
       setErrorMsg('');
-      localStorage.setItem('tthc_admin_username', username);
+      const displayName = auth.user.fullName || auth.user.username;
+      localStorage.setItem('tthc_admin_username', auth.user.username);
+      localStorage.setItem('tthc_is_admin_logged_in', 'true');
+      setUsername(auth.user.username);
+
+      // Sync form fields with active props when logging in
+      setSiteTitle(settings.siteTitle);
+      setSiteSubtitle(settings.siteSubtitle);
+      setLogoEmoji(settings.logoEmoji);
+      setBadgeLabel(settings.badgeLabel);
+      setSystemVersion(settings.systemVersion);
+      setFooterMainText(settings.footerMainText);
+      setFooterSubText(settings.footerSubText);
+      setOnlineExcelUrl(settings.onlineExcelUrl || '');
+      setOnlineExcelAutoSync(settings.onlineExcelAutoSync || false);
+      setOnlineExcelSyncMode(settings.onlineExcelSyncMode || 'merge');
+
+      onShowToast(`Đăng nhập thành công với tài khoản quản trị ${displayName}! Đã mở toàn quyền Thêm, Sửa, Xóa.`, 'success');
+      return;
+    }
+
+    // 2. Legacy fallback
+    const lowerUser = cleanUser.toLowerCase();
+    const isHongvm = (lowerUser === 'hongvm' || lowerUser === 'hongvm.bache@gmail.com') && (cleanPass === 'Vungochan@2015' || cleanPass === 'vungochan@2015');
+    const isNguyenVanA = lowerUser === 'nguyenvana' && cleanPass === 'nguyenvana@2026';
+    const isAdmin = lowerUser === 'admin' && (cleanPass === 'Vungochan@2015' || cleanPass === 'vungochan@2015' || cleanPass === 'admin@2026' || cleanPass === '123456');
+
+    if (isHongvm || isNguyenVanA || isAdmin) {
+      setIsAuthorized(true);
+      setErrorMsg('');
+      const displayName = isHongvm ? 'Hongvm' : (isAdmin ? 'Admin' : 'NguyenVanA');
+      localStorage.setItem('tthc_admin_username', displayName);
+      localStorage.setItem('tthc_is_admin_logged_in', 'true');
+      setUsername(displayName);
       
       // Sync form fields with active props when logging in
       setSiteTitle(settings.siteTitle);
@@ -144,10 +190,10 @@ export default function AdminPanel({
       setOnlineExcelAutoSync(settings.onlineExcelAutoSync || false);
       setOnlineExcelSyncMode(settings.onlineExcelSyncMode || 'merge');
       
-      onShowToast('Đăng nhập hệ thống quản trị viên thành công!', 'success');
+      onShowToast(`Đăng nhập thành công với tài khoản quản trị ${displayName}! Đã mở toàn quyền Thêm, Sửa, Xóa.`, 'success');
     } else {
-      setErrorMsg('Tên đăng nhập hoặc mật khẩu quản trị không chính xác.');
-      onShowToast('Đăng nhập thất bại!', 'error');
+      setErrorMsg(auth.error || 'Tên đăng nhập hoặc mật khẩu quản trị không chính xác. Vui lòng thử tài khoản Hongvm / Vungochan@2015');
+      onShowToast('Đăng nhập thất bại! Vui lòng kiểm tra lại tài khoản hoặc mật khẩu.', 'error');
     }
   };
 
@@ -156,7 +202,8 @@ export default function AdminPanel({
     setUsername('');
     setPassword('');
     localStorage.removeItem('tthc_admin_username');
-    onShowToast('Đã đăng xuất khỏi tài khoản quản trị.', 'info');
+    localStorage.removeItem('tthc_is_admin_logged_in');
+    onShowToast('Đã đăng xuất khỏi tài khoản quản trị viên.', 'info');
   };
 
   // Save the entire system configurations
@@ -448,9 +495,36 @@ export default function AdminPanel({
                       ? 'bg-white text-indigo-700 shadow-sm border border-slate-200/80' 
                       : 'hover:bg-slate-200 text-slate-600'
                   }`}
+                  id="tab-btn-system"
                 >
                   <Sliders className="w-3.5 h-3.5" />
                   Giao diện & Hệ thống
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('kiosk')}
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                    activeTab === 'kiosk' 
+                      ? 'bg-white text-red-700 shadow-sm border border-slate-200/80' 
+                      : 'hover:bg-slate-200 text-slate-600'
+                  }`}
+                  id="tab-btn-kiosk"
+                >
+                  <Monitor className="w-3.5 h-3.5 text-red-600" />
+                  <span>Banner & Footer Kiosk</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('users')}
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                    activeTab === 'users' 
+                      ? 'bg-white text-purple-700 shadow-sm border border-slate-200/80' 
+                      : 'hover:bg-slate-200 text-slate-600'
+                  }`}
+                  id="tab-btn-users"
+                >
+                  <Users className="w-3.5 h-3.5 text-purple-600" />
+                  <span>Người dùng & Phân quyền</span>
                 </button>
                 <button
                   type="button"
@@ -513,14 +587,14 @@ export default function AdminPanel({
             <div className="flex-1 overflow-y-auto p-6 bg-slate-50/40">
               {!isAuthorized ? (
                 /* 1. Unauthorized login form */
-                <form onSubmit={handleLogin} className="max-w-md mx-auto space-y-4 py-8" id="admin-login-form">
-                  <div className="text-center space-y-1.5 mb-6">
-                    <div className="bg-amber-100 text-amber-800 p-4 rounded-full w-16 h-16 mx-auto flex items-center justify-center shadow-inner">
-                      <Lock className="w-7 h-7" />
+                <form onSubmit={handleLogin} className="max-w-md mx-auto space-y-4 py-6" id="admin-login-form">
+                  <div className="text-center space-y-1.5 mb-5">
+                    <div className="bg-amber-100 text-amber-800 p-3.5 rounded-full w-14 h-14 mx-auto flex items-center justify-center shadow-inner">
+                      <Lock className="w-6 h-6" />
                     </div>
-                    <h4 className="font-bold text-slate-800 text-sm uppercase mt-2 tracking-wide">Đăng nhập tài khoản Admin</h4>
+                    <h4 className="font-bold text-slate-800 text-sm uppercase mt-2 tracking-wide">Đăng nhập tài khoản Quản trị viên</h4>
                     <p className="text-xs text-slate-500 font-semibold">
-                      Nhập thông tin xác thực để thay đổi giao diện, cấu trúc và footer
+                      Đăng nhập để có quyền Thêm mới, Sửa đổi dữ liệu, Xóa TTHC và cấu hình hệ thống
                     </p>
                   </div>
 
@@ -536,7 +610,7 @@ export default function AdminPanel({
                       <input
                         type="text"
                         required
-                        placeholder="Ví dụ: NguyenVanA"
+                        placeholder="Ví dụ: Hongvm hoặc admin"
                         className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:border-red-600 focus:bg-white transition-colors"
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
@@ -549,7 +623,7 @@ export default function AdminPanel({
                       <input
                         type="password"
                         required
-                        placeholder="Nhập nguyenvana@2026"
+                        placeholder="Nhập mật khẩu quản trị"
                         className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:border-red-600 focus:bg-white transition-colors"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
@@ -563,11 +637,56 @@ export default function AdminPanel({
                       id="submit-admin-login"
                     >
                       <LogIn className="w-4 h-4" />
-                      <span>Xác thực & Mở cổng quản trị</span>
+                      <span>Xác thực & Mở quyền Quản trị (Thêm, Sửa, Xóa)</span>
                     </button>
                   </div>
-                  
-                  
+
+                  {/* Quick-fill helper for convenience */}
+                  <div className="bg-amber-50/80 border border-amber-200 rounded-xl p-3.5 space-y-2">
+                    <div className="flex items-center gap-1.5 text-amber-900 font-bold text-xs uppercase tracking-wider">
+                      <Lock className="w-3.5 h-3.5 text-amber-700" />
+                      <span>Thông tin tài khoản quản trị hệ thống</span>
+                    </div>
+                    <div className="space-y-1.5 text-xs">
+                      <div className="flex items-center justify-between p-2 bg-white rounded-lg border border-amber-200 shadow-xs">
+                        <div>
+                          <span className="font-bold text-red-900 font-mono">Hongvm</span>
+                          <span className="text-slate-400 mx-1.5">•</span>
+                          <span className="text-slate-600 font-mono text-[11px]">Vungochan@2015</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUsername('Hongvm');
+                            setPassword('Vungochan@2015');
+                            setErrorMsg('');
+                          }}
+                          className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded font-bold text-[10.5px] cursor-pointer"
+                        >
+                          Điền tự động
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between p-2 bg-white rounded-lg border border-amber-200 shadow-xs">
+                        <div>
+                          <span className="font-bold text-slate-800 font-mono">admin</span>
+                          <span className="text-slate-400 mx-1.5">•</span>
+                          <span className="text-slate-600 font-mono text-[11px]">Vungochan@2015</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUsername('admin');
+                            setPassword('Vungochan@2015');
+                            setErrorMsg('');
+                          }}
+                          className="px-2.5 py-1 bg-slate-800 hover:bg-slate-900 text-white rounded font-bold text-[10.5px] cursor-pointer"
+                        >
+                          Điền tự động
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </form>
               ) : (
                 /* 2. Logged-in workspace with separated views */
@@ -699,6 +818,28 @@ export default function AdminPanel({
                           Cập nhật Cài đặt Hệ thống
                         </button>
                       </div>
+                    </div>
+                  )}
+
+                  {/* TAB: KIOSK BANNER & FOOTER CONFIGURATION */}
+                  {activeTab === 'kiosk' && (
+                    <div className="animate-fadeIn">
+                      <KioskManagementTab
+                        settings={settings}
+                        onSaveSettings={onSaveSettings}
+                        onShowToast={onShowToast}
+                        procedures={procedures}
+                      />
+                    </div>
+                  )}
+
+                  {/* TAB: USER MANAGEMENT & ROLE PERMISSIONS */}
+                  {activeTab === 'users' && (
+                    <div className="animate-fadeIn">
+                      <UserManagementTab
+                        onShowToast={onShowToast}
+                        currentUsername={username}
+                      />
                     </div>
                   )}
 

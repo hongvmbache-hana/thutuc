@@ -24,7 +24,8 @@ import {
   Check,
   TrendingUp,
   SlidersHorizontal,
-  ChevronDown
+  ChevronDown,
+  Lock
 } from 'lucide-react';
 
 interface BienDongReportModalProps {
@@ -34,6 +35,8 @@ interface BienDongReportModalProps {
   onUpdateProcedure?: (updated: Procedure) => void;
   availableLinhVuc?: string[];
   agencyName?: string;
+  isAdminLoggedIn?: boolean;
+  onRequireAdminLogin?: () => void;
 }
 
 export default function BienDongReportModal({
@@ -42,7 +45,9 @@ export default function BienDongReportModal({
   procedures,
   onUpdateProcedure,
   availableLinhVuc = [],
-  agencyName = 'UBND XÃ BA CHẼ'
+  agencyName = 'UBND XÃ BA CHẼ',
+  isAdminLoggedIn = true,
+  onRequireAdminLogin
 }: BienDongReportModalProps) {
   // Current date values
   const now = new Date();
@@ -107,6 +112,10 @@ export default function BienDongReportModal({
 
   // Handle Quick Status Update for a procedure directly in the modal
   const handleQuickStatusChange = (proc: Procedure, newStatus: TrangThaiBienDong) => {
+    if (!isAdminLoggedIn) {
+      if (onRequireAdminLogin) onRequireAdminLogin();
+      return;
+    }
     if (!onUpdateProcedure) return;
     const updated: Procedure = {
       ...proc,

@@ -14,7 +14,8 @@ import {
   ArrowRight,
   Database,
   Globe,
-  Loader2
+  Loader2,
+  Lock
 } from 'lucide-react';
 import ExcelJS from 'exceljs';
 import { fetchOnlineSpreadsheet, parseSpreadsheetBuffer } from '../utils/onlineExcelSync';
@@ -27,6 +28,8 @@ interface ImportExcelModalProps {
   onImportSuccess: (imported: Procedure[], mode: 'merge' | 'add_only' | 'replace_all') => void;
   onShowToast: (message: string, type: 'success' | 'info' | 'error') => void;
   onAddNewPresets?: (newLinhVuc: string[], newSoNganh: string[]) => void;
+  isAdminLoggedIn?: boolean;
+  onRequireAdminLogin?: () => void;
 }
 
 export default function ImportExcelModal({
@@ -35,7 +38,9 @@ export default function ImportExcelModal({
   existingProcedures,
   onImportSuccess,
   onShowToast,
-  onAddNewPresets
+  onAddNewPresets,
+  isAdminLoggedIn = true,
+  onRequireAdminLogin
 }: ImportExcelModalProps) {
   const [file, setFile] = useState<File | null>(null);
   const [isParsing, setIsParsing] = useState(false);
@@ -343,6 +348,15 @@ export default function ImportExcelModal({
 
   // 3. EXECUTE IMPORT
   const handleConfirmImport = () => {
+    if (!isAdminLoggedIn) {
+      onShowToast('Vui lòng đăng nhập tài khoản Quản trị viên để có quyền nạp dữ liệu thủ tục vào hệ thống!', 'error');
+      if (onRequireAdminLogin) {
+        onClose();
+        onRequireAdminLogin();
+      }
+      return;
+    }
+
     if (parsedProcedures.length === 0) {
       onShowToast('Chưa có dữ liệu nào để nhập vào hệ thống!', 'error');
       return;

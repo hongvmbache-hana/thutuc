@@ -23,7 +23,8 @@ import {
   Eye,
   AlertCircle,
   HelpCircle,
-  Upload
+  Upload,
+  Lock
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { Procedure, AppSettings } from '../types';
@@ -40,6 +41,8 @@ interface OnlineSpreadsheetModalProps {
   capThucHienPresets: string[];
   settings: AppSettings;
   onShowToast: (message: string, type: 'success' | 'info' | 'error') => void;
+  isAdminLoggedIn?: boolean;
+  onRequireAdminLogin?: () => void;
 }
 
 export default function OnlineSpreadsheetModal({
@@ -51,7 +54,9 @@ export default function OnlineSpreadsheetModal({
   soNganhPresets,
   capThucHienPresets,
   settings,
-  onShowToast
+  onShowToast,
+  isAdminLoggedIn = true,
+  onRequireAdminLogin
 }: OnlineSpreadsheetModalProps) {
   if (!isOpen) return null;
 
@@ -116,6 +121,12 @@ export default function OnlineSpreadsheetModal({
   }, [linhVucPresets, soNganhPresets, settings, onUpdateProcedures, onShowToast]);
 
   const handleCellChange = (id: string, field: keyof Procedure, value: any) => {
+    if (!isAdminLoggedIn) {
+      onShowToast('Vui lòng đăng nhập Quản trị viên để chỉnh sửa biểu mẫu trực tuyến!', 'error');
+      if (onRequireAdminLogin) onRequireAdminLogin();
+      return;
+    }
+
     const updated = gridData.map(row => {
       if (row.id === id) {
         return {
@@ -141,6 +152,12 @@ export default function OnlineSpreadsheetModal({
 
   // Add new row at the top
   const handleAddNewRow = () => {
+    if (!isAdminLoggedIn) {
+      onShowToast('Vui lòng đăng nhập Quản trị viên để thêm thủ tục mới!', 'error');
+      if (onRequireAdminLogin) onRequireAdminLogin();
+      return;
+    }
+
     const newId = `tthc_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const newProcedure: Procedure = {
       id: newId,
@@ -168,6 +185,12 @@ export default function OnlineSpreadsheetModal({
 
   // Duplicate a row
   const handleDuplicateRow = (proc: Procedure) => {
+    if (!isAdminLoggedIn) {
+      onShowToast('Vui lòng đăng nhập Quản trị viên để nhân bản thủ tục!', 'error');
+      if (onRequireAdminLogin) onRequireAdminLogin();
+      return;
+    }
+
     const newId = `tthc_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const cloned: Procedure = {
       ...proc,
@@ -189,6 +212,12 @@ export default function OnlineSpreadsheetModal({
 
   // Delete single row
   const handleDeleteRow = (id: string, maTthc: string) => {
+    if (!isAdminLoggedIn) {
+      onShowToast('Vui lòng đăng nhập Quản trị viên để xóa thủ tục!', 'error');
+      if (onRequireAdminLogin) onRequireAdminLogin();
+      return;
+    }
+
     if (!window.confirm(`Bạn có chắc chắn muốn xóa thủ tục "${maTthc || 'này'}" khỏi biểu mẫu online và hệ thống web?`)) {
       return;
     }
@@ -205,6 +234,12 @@ export default function OnlineSpreadsheetModal({
 
   // Delete multiple selected rows
   const handleDeleteSelected = () => {
+    if (!isAdminLoggedIn) {
+      onShowToast('Vui lòng đăng nhập Quản trị viên để xóa dữ liệu!', 'error');
+      if (onRequireAdminLogin) onRequireAdminLogin();
+      return;
+    }
+
     if (selectedIds.size === 0) return;
     if (!window.confirm(`Bạn có chắc chắn muốn xóa ${selectedIds.size} thủ tục đã chọn khỏi biểu mẫu online và hệ thống web?`)) {
       return;
@@ -294,6 +329,12 @@ export default function OnlineSpreadsheetModal({
 
   // Paste handler
   const handleApplyPastedText = () => {
+    if (!isAdminLoggedIn) {
+      onShowToast('Vui lòng đăng nhập Quản trị viên để dán dữ liệu vào biểu mẫu!', 'error');
+      if (onRequireAdminLogin) onRequireAdminLogin();
+      return;
+    }
+
     if (!pasteRawText.trim()) return;
 
     try {
@@ -464,6 +505,26 @@ export default function OnlineSpreadsheetModal({
           
           {/* Left Action Buttons */}
           <div className="flex flex-wrap items-center gap-2">
+            {!isAdminLoggedIn ? (
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-100/90 border border-amber-300 rounded-lg text-amber-900 text-xs font-semibold">
+                <Lock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                <span className="hidden sm:inline">Chế độ Chỉ đọc:</span>
+                {onRequireAdminLogin && (
+                  <button
+                    type="button"
+                    onClick={onRequireAdminLogin}
+                    className="px-2 py-0.5 bg-amber-600 hover:bg-amber-700 text-white rounded font-bold text-[11px] cursor-pointer shadow-xs"
+                  >
+                    Đăng nhập Quản trị để Sửa
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-emerald-100 border border-emerald-300 rounded-lg text-emerald-800 text-[11px] font-bold">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>Toàn quyền Quản trị (2 chiều)</span>
+              </div>
+            )}
             
             {/* Add Row Button */}
             <button
@@ -480,7 +541,14 @@ export default function OnlineSpreadsheetModal({
             {/* Save All Explicit Button */}
             <button
               type="button"
-              onClick={() => triggerSave(gridData, true)}
+              onClick={() => {
+                if (!isAdminLoggedIn) {
+                  onShowToast('Vui lòng đăng nhập Quản trị viên để lưu cập nhật dữ liệu!', 'error');
+                  if (onRequireAdminLogin) onRequireAdminLogin();
+                  return;
+                }
+                triggerSave(gridData, true);
+              }}
               disabled={isSaving}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-xs cursor-pointer active:scale-95 transition-all disabled:opacity-50"
               title="Lưu tất cả thay đổi ngay lập tức lên Cổng Web & Máy chủ"

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Procedure, SearchFilters, AppSettings } from './types';
 import { INITIAL_PROCEDURES, LINH_VUC_PRESETS, SO_NGANH_PRESETS, CAP_THUC_HIEN_PRESETS, DEFAULT_APP_SETTINGS } from './mockData';
 import Header from './components/Header';
@@ -10,6 +10,7 @@ import AdminPanel from './components/AdminPanel';
 import ImportExcelModal from './components/ImportExcelModal';
 import BienDongReportModal from './components/BienDongReportModal';
 import OnlineSpreadsheetModal from './components/OnlineSpreadsheetModal';
+import AdminLoginModal from './components/AdminLoginModal';
 import NiemYetBoard from './components/NiemYetBoard';
 import { getProcedureTrangThai } from './utils/bienDongHelper';
 import { fetchOnlineSpreadsheet, parseSpreadsheetBuffer } from './utils/onlineExcelSync';
@@ -38,7 +39,11 @@ import {
   FileBarChart2,
   TrendingUp,
   FileSpreadsheet,
-  LayoutGrid
+  LayoutGrid,
+  Lock,
+  LogOut,
+  Sliders,
+  ShieldCheck
 } from 'lucide-react';
 
 export default function App() {
@@ -94,16 +99,32 @@ export default function App() {
     return localStorage.getItem('tthc_is_admin_logged_in') === 'true';
   });
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
+  const [isAdminLoginModalOpen, setIsAdminLoginModalOpen] = useState(false);
+  const [loginActionContext, setLoginActionContext] = useState<string>('Thao tác Quản trị Dữ liệu');
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
 
   const handleAdminLoggedInChange = (val: boolean) => {
     setIsAdminLoggedIn(val);
     localStorage.setItem('tthc_is_admin_logged_in', String(val));
+    if (!val) {
+      localStorage.removeItem('tthc_admin_username');
+    }
   };
 
-  const checkAdminPermission = (): boolean => {
+  const handleAdminLogout = () => {
+    handleAdminLoggedInChange(false);
+    showToast('Đã đăng xuất tài khoản Quản trị. Hệ thống chuyển về Chế độ Xem (Chỉ đọc).', 'info');
+  };
+
+  const checkAdminPermission = (actionName?: string, onAuthorizedCallback?: () => void): boolean => {
     if (!isAdminLoggedIn) {
-      showToast("Vui lòng đăng nhập tài khoản quản trị (Admin) để có thẩm quyền thêm, sửa, xóa thủ tục!", "error");
-      setIsAdminPanelOpen(true);
+      setLoginActionContext(actionName || 'Thao tác dữ liệu TTHC');
+      if (onAuthorizedCallback) {
+        setPendingAction(() => onAuthorizedCallback);
+      } else {
+        setPendingAction(null);
+      }
+      setIsAdminLoginModalOpen(true);
       return false;
     }
     return true;
@@ -319,6 +340,11 @@ export default function App() {
     }
   };
 
+  const serverLastUpdatedRef = useRef<string | null>(serverLastUpdated);
+  useEffect(() => {
+    serverLastUpdatedRef.current = serverLastUpdated;
+  }, [serverLastUpdated]);
+
   // Nạp dữ liệu ban đầu và thiết lập lắng nghe đồng bộ
   useEffect(() => {
     // 1. Nạp tức thời từ LocalStorage để không bị trễ màn hình
@@ -341,7 +367,7 @@ export default function App() {
     // 3. Tự động kiểm tra cập nhật khi người dùng chuyển lại tab (focus)
     const handleWindowFocus = () => {
       fetchServerData().then(res => {
-        if (res && res.success && res.lastUpdated && res.lastUpdated !== serverLastUpdated) {
+        if (res && res.success && res.lastUpdated && res.lastUpdated !== serverLastUpdatedRef.current) {
           loadDataFromServer(false);
         }
       }).catch(() => {});
@@ -351,7 +377,7 @@ export default function App() {
     // 4. Định kỳ kiểm tra sau mỗi 25 giây
     const pollInterval = setInterval(() => {
       fetchServerData().then(res => {
-        if (res && res.success && res.lastUpdated && res.lastUpdated !== serverLastUpdated) {
+        if (res && res.success && res.lastUpdated && res.lastUpdated !== serverLastUpdatedRef.current) {
           loadDataFromServer(false);
         }
       }).catch(() => {});
@@ -361,7 +387,7 @@ export default function App() {
       window.removeEventListener('focus', handleWindowFocus);
       clearInterval(pollInterval);
     };
-  }, [serverLastUpdated]);
+  }, []);
 
   // Auto-sync in background from Online Excel if configured and autoSync is active
   useEffect(() => {
@@ -390,6 +416,12 @@ export default function App() {
 
   // Sync to LocalStorage AND Central Shared Server whenever procedures change
   const saveProceduresToStorage = (updatedProcedures: Procedure[]) => {
+    if (!isAdminLoggedIn) {
+      showToast("Chỉ tài khoản Quản trị viên mới có quyền cập nhật và lưu trữ dữ liệu!", "error");
+      setIsAdminLoginModalOpen(true);
+      return;
+    }
+
     setProcedures(updatedProcedures);
     localStorage.setItem('tthc_procedures', JSON.stringify(updatedProcedures));
 
@@ -463,7 +495,10 @@ export default function App() {
   
   // Create or Update
   const handleSaveProcedure = (newProcedure: Procedure) => {
-    if (!checkAdminPermission()) return;
+    if (!checkAdminPermission(
+      editingProcedure ? `Cập nhật thủ tục [${newProcedure.maTthc}]` : 'Thêm mới thủ tục hành chính',
+      () => handleSaveProcedure(newProcedure)
+    )) return;
     let updated: Procedure[];
     
     if (editingProcedure) {
@@ -490,7 +525,7 @@ export default function App() {
 
   // Delete single procedure
   const handleDeleteProcedure = (id: string, maTthc: string) => {
-    if (!checkAdminPermission()) return;
+    if (!checkAdminPermission(`Xóa thủ tục [${maTthc}]`, () => handleDeleteProcedure(id, maTthc))) return;
     setCustomConfirm({
       title: 'Xác nhận xóa thủ tục',
       message: `Bạn có chắc chắn muốn xóa thủ tục hành chính có mã [${maTthc}] ra khỏi hệ thống cơ sở dữ liệu không? Hành động này không thể hoàn tác!`,
@@ -512,7 +547,7 @@ export default function App() {
 
   // Delete multiple selected procedures
   const handleDeleteSelected = () => {
-    if (!checkAdminPermission()) return;
+    if (!checkAdminPermission(`Xóa ${selectedIds.size} thủ tục đã chọn`, () => handleDeleteSelected())) return;
     if (selectedIds.size === 0) {
       showToast('Vui lòng chọn ít nhất một thủ tục để xóa!', 'error');
       return;
@@ -536,7 +571,7 @@ export default function App() {
 
   // Delete ALL procedures in database
   const handleDeleteAllProcedures = () => {
-    if (!checkAdminPermission()) return;
+    if (!checkAdminPermission('Xóa toàn bộ cơ sở dữ liệu TTHC', () => handleDeleteAllProcedures())) return;
     if (procedures.length === 0) {
       showToast('Cơ sở dữ liệu hiện không có thủ tục nào để xóa!', 'info');
       return;
@@ -559,7 +594,7 @@ export default function App() {
 
   // Clone/Copy procedure for rapid creation
   const handleCloneProcedure = (proto: Procedure) => {
-    if (!checkAdminPermission()) return;
+    if (!checkAdminPermission(`Nhân bản thủ tục [${proto.maTthc}]`, () => handleCloneProcedure(proto))) return;
     const cloned: Procedure = {
       ...proto,
       id: `tthc-${Date.now()}`,
@@ -580,7 +615,7 @@ export default function App() {
 
   // INLINE Toggles for rapid editing ("quản lý thêm, sửa, xóa nhanh nhất")
   const toggleInlineField = (id: string, field: keyof Pick<Procedure, 'bcciTiepNhan' | 'bcciTraKetQua' | 'motCua' | 'dungChung'>) => {
-    if (!checkAdminPermission()) return;
+    if (!checkAdminPermission('Thay đổi nhanh thiết lập TTHC', () => toggleInlineField(id, field))) return;
     const updated = procedures.map(p => {
       if (p.id === id) {
         const newVal = !p[field];
@@ -597,7 +632,7 @@ export default function App() {
   };
 
   const handleInlineDvcttChange = (id: string, value: 'Toàn trình' | 'Một phần' | 'Không') => {
-    if (!checkAdminPermission()) return;
+    if (!checkAdminPermission('Thay đổi dịch vụ công trực tuyến', () => handleInlineDvcttChange(id, value))) return;
     const updated = procedures.map(p => {
       if (p.id === id) {
         return {
@@ -616,7 +651,7 @@ export default function App() {
   
   // Reset database back to default
   const handleResetToPresets = () => {
-    if (!checkAdminPermission()) return;
+    if (!checkAdminPermission('Khôi phục danh sách gốc ban đầu', () => handleResetToPresets())) return;
     setCustomConfirm({
       title: 'Khôi phục dữ liệu gốc',
       message: 'Hành động này sẽ khôi phục dữ liệu về danh sách 11 thủ tục mẫu ban đầu tại Nghệ An & các bộ ngành trên cả máy này và máy chủ dùng chung. Mọi sửa đổi và dữ liệu hiện tại của bạn sẽ bị ghi đè hoàn toàn! Bạn có chắc chắn muốn thực hiện?',
@@ -654,7 +689,7 @@ export default function App() {
 
   // Upload JSON backup file
   const handleBackupUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!checkAdminPermission()) {
+    if (!checkAdminPermission('Nạp dữ liệu sao lưu JSON')) {
       event.target.value = ''; // clear input
       return;
     }
@@ -685,7 +720,7 @@ export default function App() {
     mode: 'merge' | 'add_only' | 'replace_all',
     bypassAuthCheck: boolean = false
   ) => {
-    if (!bypassAuthCheck && !checkAdminPermission()) return;
+    if (!bypassAuthCheck && !checkAdminPermission('Nhập dữ liệu TTHC từ file Excel', () => handleImportSuccess(imported, mode, true))) return;
 
     let updatedList: Procedure[] = [];
 
@@ -990,12 +1025,55 @@ export default function App() {
             <button
               type="button"
               onClick={() => setIsOnlineSpreadsheetOpen(true)}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1 bg-emerald-700/90 hover:bg-emerald-600 text-emerald-100 rounded-md text-xs font-semibold cursor-pointer border border-emerald-600 transition-colors"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700/90 hover:bg-emerald-600 text-emerald-100 rounded-lg text-xs font-semibold cursor-pointer border border-emerald-600 transition-colors"
               title="Mở biểu mẫu đồng bộ 2 chiều với Google Sheets / Excel Online"
             >
               <Globe className="w-3.5 h-3.5 text-emerald-300" />
-              <span>Biểu mẫu Online (2 chiều)</span>
+              <span>Biểu mẫu Online</span>
             </button>
+
+            {isAdminLoggedIn ? (
+              <div className="flex items-center gap-1.5 bg-slate-800/90 p-1 rounded-lg border border-slate-700">
+                <div 
+                  className="flex items-center gap-1.5 px-2 py-0.5 text-emerald-400 font-bold text-xs" 
+                  title="Đã đăng nhập Quản trị viên - Toàn quyền Thêm, Sửa, Xóa"
+                >
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  <span className="hidden md:inline font-mono">{localStorage.getItem('tthc_admin_username') || 'Admin'}</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsAdminPanelOpen(true)}
+                  className="p-1 text-slate-300 hover:text-amber-300 hover:bg-slate-700/60 rounded cursor-pointer transition-colors"
+                  title="Cài đặt hệ thống"
+                >
+                  <Sliders className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAdminLogout}
+                  className="p-1 text-rose-400 hover:text-rose-200 hover:bg-rose-950/60 rounded cursor-pointer transition-colors"
+                  title="Đăng xuất quyền quản trị"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setLoginActionContext('Đăng nhập Quản trị viên để Thêm, Sửa, Xóa TTHC');
+                  setIsAdminLoginModalOpen(true);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-lg transition-all shadow-sm cursor-pointer active:scale-95"
+                id="top-nav-admin-login-btn"
+                title="Đăng nhập để có quyền Thêm, Sửa, Xóa dữ liệu"
+              >
+                <Lock className="w-3.5 h-3.5 text-slate-950" />
+                <span>Đăng nhập Quản trị</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1147,7 +1225,6 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => {
-                  if (!checkAdminPermission()) return;
                   setIsOnlineSpreadsheetOpen(true);
                 }}
                 className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-lg text-xs font-bold shadow-xs hover:shadow-md transition-all cursor-pointer active:scale-95 border border-emerald-500"
@@ -1163,7 +1240,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => {
-                  if (!checkAdminPermission()) return;
+                  if (!checkAdminPermission('Nhập dữ liệu TTHC từ file Excel', () => setIsImportExcelOpen(true))) return;
                   setIsImportExcelOpen(true);
                 }}
                 className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-95"
@@ -1270,7 +1347,10 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => {
-                  if (!checkAdminPermission()) return;
+                  if (!checkAdminPermission('Thêm thủ tục hành chính mới', () => {
+                    setEditingProcedure(null);
+                    setIsModalOpen(true);
+                  })) return;
                   setEditingProcedure(null);
                   setIsModalOpen(true);
                 }}
@@ -1714,7 +1794,10 @@ export default function App() {
                             <button
                               type="button"
                               onClick={() => {
-                                if (!checkAdminPermission()) return;
+                                if (!checkAdminPermission(`Chỉnh sửa thủ tục [${p.maTthc}]`, () => {
+                                  setEditingProcedure(p);
+                                  setIsModalOpen(true);
+                                })) return;
                                 setEditingProcedure(p);
                                 setIsModalOpen(true);
                               }}
@@ -1817,6 +1900,11 @@ export default function App() {
         linhVucPresets={availableLinhVucPreset}
         soNganhPresets={availableSoNganhPreset}
         capThucHienPresets={availableCapThucHienPreset}
+        isAdminLoggedIn={isAdminLoggedIn}
+        onRequireAdminLogin={() => {
+          setLoginActionContext('Lưu thông tin thủ tục hành chính');
+          setIsAdminLoginModalOpen(true);
+        }}
       />
 
       {/* 7. Excel Data Import Modal */}
@@ -1827,6 +1915,11 @@ export default function App() {
         onImportSuccess={handleImportSuccess}
         onShowToast={showToast}
         onAddNewPresets={handleAddNewPresets}
+        isAdminLoggedIn={isAdminLoggedIn}
+        onRequireAdminLogin={() => {
+          setLoginActionContext('Nhập dữ liệu TTHC từ file Excel');
+          setIsAdminLoginModalOpen(true);
+        }}
       />
 
       {/* 8. Custom Confirm Modal Dialog */}
@@ -1891,6 +1984,11 @@ export default function App() {
           onUpdateProcedure={handleUpdateProcedureFromModal}
           availableLinhVuc={availableLinhVucPreset}
           agencyName={settings.agencyName}
+          isAdminLoggedIn={isAdminLoggedIn}
+          onRequireAdminLogin={() => {
+            setLoginActionContext('Cập nhật trạng thái biến động thủ tục hành chính');
+            setIsAdminLoginModalOpen(true);
+          }}
         />
       )}
 
@@ -1901,16 +1999,42 @@ export default function App() {
           onClose={() => setIsOnlineSpreadsheetOpen(false)}
           procedures={procedures}
           onUpdateProcedures={(updated) => {
-            setProcedures(updated);
-            localStorage.setItem('tthc_procedures', JSON.stringify(updated));
+            saveProceduresToStorage(updated);
           }}
           linhVucPresets={availableLinhVucPreset}
           soNganhPresets={availableSoNganhPreset}
           capThucHienPresets={availableCapThucHienPreset}
           settings={settings}
           onShowToast={showToast}
+          isAdminLoggedIn={isAdminLoggedIn}
+          onRequireAdminLogin={() => {
+            setLoginActionContext('Chỉnh sửa biểu mẫu online 2 chiều');
+            setIsAdminLoginModalOpen(true);
+          }}
         />
       )}
+
+      {/* 11. Modal Đăng nhập Quản trị viên */}
+      <AdminLoginModal
+        isOpen={isAdminLoginModalOpen}
+        onClose={() => {
+          setIsAdminLoginModalOpen(false);
+          setPendingAction(null);
+        }}
+        onShowToast={showToast}
+        onLoginSuccess={(displayName) => {
+          localStorage.setItem('tthc_admin_username', displayName || 'Hongvm');
+          handleAdminLoggedInChange(true);
+          setIsAdminLoginModalOpen(false);
+          showToast(`Đăng nhập Quản trị viên thành công (${displayName || 'Hongvm'})! Bạn đã có quyền Thêm, Sửa, Xóa dữ liệu.`, 'success');
+          if (pendingAction) {
+            const action = pendingAction;
+            setPendingAction(null);
+            action();
+          }
+        }}
+        actionTitle={loginActionContext}
+      />
 
     </div>
   );
