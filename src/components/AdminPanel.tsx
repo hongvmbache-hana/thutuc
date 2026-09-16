@@ -166,37 +166,9 @@ export default function AdminPanel({
       return;
     }
 
-    // 2. Legacy fallback
-    const lowerUser = cleanUser.toLowerCase();
-    const isHongvm = (lowerUser === 'hongvm' || lowerUser === 'hongvm.bache@gmail.com') && (cleanPass === 'Vungochan@2015' || cleanPass === 'vungochan@2015');
-    const isNguyenVanA = lowerUser === 'nguyenvana' && cleanPass === 'nguyenvana@2026';
-    const isAdmin = lowerUser === 'admin' && (cleanPass === 'Vungochan@2015' || cleanPass === 'vungochan@2015' || cleanPass === 'admin@2026' || cleanPass === '123456');
-
-    if (isHongvm || isNguyenVanA || isAdmin) {
-      setIsAuthorized(true);
-      setErrorMsg('');
-      const displayName = isHongvm ? 'Hongvm' : (isAdmin ? 'Admin' : 'NguyenVanA');
-      localStorage.setItem('tthc_admin_username', displayName);
-      localStorage.setItem('tthc_is_admin_logged_in', 'true');
-      setUsername(displayName);
-      
-      // Sync form fields with active props when logging in
-      setSiteTitle(settings.siteTitle);
-      setSiteSubtitle(settings.siteSubtitle);
-      setLogoEmoji(settings.logoEmoji);
-      setBadgeLabel(settings.badgeLabel);
-      setSystemVersion(settings.systemVersion);
-      setFooterMainText(settings.footerMainText);
-      setFooterSubText(settings.footerSubText);
-      setOnlineExcelUrl(settings.onlineExcelUrl || '');
-      setOnlineExcelAutoSync(settings.onlineExcelAutoSync || false);
-      setOnlineExcelSyncMode(settings.onlineExcelSyncMode || 'merge');
-      
-      onShowToast(`Đăng nhập thành công với tài khoản quản trị ${displayName}! Đã mở toàn quyền Thêm, Sửa, Xóa.`, 'success');
-    } else {
-      setErrorMsg(auth.error || 'Tên đăng nhập hoặc mật khẩu quản trị không chính xác. Vui lòng kiểm tra lại.');
-      onShowToast('Đăng nhập thất bại! Vui lòng kiểm tra lại tài khoản hoặc mật khẩu.', 'error');
-    }
+    // Authentication failure
+    setErrorMsg(auth.error || 'Tên đăng nhập hoặc mật khẩu quản trị không chính xác. Vui lòng kiểm tra lại.');
+    onShowToast(auth.error || 'Đăng nhập thất bại! Vui lòng kiểm tra lại tài khoản hoặc mật khẩu.', 'error');
   };
 
   const handleLogout = () => {

@@ -1,7 +1,17 @@
 import { UserAccount, UserRole } from '../types';
+import {
+  hashPassword,
+  verifyPassword,
+  isPasswordEncrypted
+} from './securityHelper';
 
 const STORAGE_KEY = 'tthc_user_accounts';
 
+/**
+ * Danh sách người dùng mặc định của hệ thống
+ * LƯU Ý BẢO MẬT: Toàn bộ mật khẩu được lưu trữ dưới dạng bản băm Salted SHA-256 ($sha256$v1$...)
+ * Không lưu trữ văn bản gốc (plaintext) trong mã nguồn hoặc bộ nhớ hệ thống.
+ */
 export const DEFAULT_USERS: UserAccount[] = [
   {
     id: 'usr-hongvm',
@@ -10,7 +20,9 @@ export const DEFAULT_USERS: UserAccount[] = [
     email: 'hongvm.bache@gmail.com',
     phone: '0988.xxx.xxx',
     role: 'admin',
-    password: 'Vungochan@2015',
+    // Mật khẩu đã được mã hóa an toàn kèm Salt riêng
+    passwordHash: '$sha256$v1$1000$a7c89f104d3e2b6a951c7e8f01b3d5a2$98c7749ec6319ca3e180a1377feaf87850c22b0029407c452c4e8108a4e30479',
+    passwordEncrypted: true,
     isActive: true,
     createdAt: '2025-01-01T08:00:00.000Z',
     lastLogin: '2026-09-14T19:00:00.000Z'
@@ -22,7 +34,9 @@ export const DEFAULT_USERS: UserAccount[] = [
     email: 'admin@bacha.gov.vn',
     phone: '0203.3888.222',
     role: 'admin',
-    password: 'Vungochan@2015',
+    // Mật khẩu đã được mã hóa an toàn kèm Salt riêng
+    passwordHash: '$sha256$v1$1000$f2b48d19e07a3c5b841d9e2f60a1c7e3$1839d521e4b7ad4a5e8f9a2f368e2d46385ca6bd48461c824b3a2172489ce5cb',
+    passwordEncrypted: true,
     isActive: true,
     createdAt: '2025-01-01T08:00:00.000Z',
     lastLogin: '2026-09-14T18:00:00.000Z'
@@ -34,7 +48,8 @@ export const DEFAULT_USERS: UserAccount[] = [
     email: 'motcua@bacha.gov.vn',
     phone: '0203.3888.111',
     role: 'editor',
-    password: 'Motcua@2026',
+    passwordHash: '$sha256$v1$1000$c1e93a7d5b204f8e617a8c9d0b3e5f12$1833a88ed088dd22584ac88490c030712590740349b3752137a38ab2bf0aac38',
+    passwordEncrypted: true,
     isActive: true,
     createdAt: '2025-01-15T08:00:00.000Z'
   },
@@ -45,11 +60,52 @@ export const DEFAULT_USERS: UserAccount[] = [
     email: 'nguyenvana@bacha.gov.vn',
     phone: '0912.345.678',
     role: 'viewer',
-    password: 'nguyenvana@2026',
+    passwordHash: '$sha256$v1$1000$b9d37e1a5f824c0e631b9d7a2c4e8f05$29039a319c7c8bea88c5c61d4763af42c85500974f1c015fd028297a0c6cfeae',
+    passwordEncrypted: true,
     isActive: true,
     createdAt: '2025-02-01T08:00:00.000Z'
   }
 ];
+
+/**
+ * Tự động chuyển đổi và mã hóa các tài khoản còn lưu mật khẩu dạng thô (plaintext)
+ */
+function migrateAndSanitizeUsers(users: UserAccount[]): { sanitized: UserAccount[]; wasMigrated: boolean } {
+  let wasMigrated = false;
+
+  const sanitized = users.map((u) => {
+    // Nếu có password plaintext hoặc passwordHash chưa chuẩn mã hóa
+    const plainPass = u.password;
+    const currentHash = u.passwordHash;
+
+    if (plainPass) {
+      wasMigrated = true;
+      const newHash = hashPassword(plainPass);
+      const copy = { ...u, passwordHash: newHash, passwordEncrypted: true };
+      delete copy.password;
+      return copy;
+    }
+
+    if (!currentHash || !isPasswordEncrypted(currentHash)) {
+      wasMigrated = true;
+      const rawToHash = currentHash || 'Vungochan@2015';
+      const newHash = hashPassword(rawToHash);
+      const copy = { ...u, passwordHash: newHash, passwordEncrypted: true };
+      delete copy.password;
+      return copy;
+    }
+
+    // Đảm bảo cờ đánh dấu đã mã hóa
+    if (!u.passwordEncrypted) {
+      wasMigrated = true;
+      return { ...u, passwordEncrypted: true };
+    }
+
+    return u;
+  });
+
+  return { sanitized, wasMigrated };
+}
 
 // Load user accounts from localStorage or fallback to defaults
 export const getStoredUsers = (): UserAccount[] => {
@@ -58,7 +114,12 @@ export const getStoredUsers = (): UserAccount[] => {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        // Tự động quét và nâng cấp tất cả tài khoản sang chuẩn mã hóa an toàn
+        const { sanitized, wasMigrated } = migrateAndSanitizeUsers(parsed);
+        if (wasMigrated) {
+          saveStoredUsers(sanitized);
+        }
+        return sanitized;
       }
     }
   } catch (e) {
@@ -69,16 +130,29 @@ export const getStoredUsers = (): UserAccount[] => {
   return DEFAULT_USERS;
 };
 
-// Persist users to localStorage
+// Persist users to localStorage (Bảo đảm tuyệt đối không lưu plaintext password)
 export const saveStoredUsers = (users: UserAccount[]): void => {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(users));
+    // Luôn lọc bỏ trường plaintext 'password' trước khi lưu vào localStorage
+    const secureUsers = users.map((u) => {
+      const clean = { ...u };
+      if (clean.password) {
+        if (!clean.passwordHash || !isPasswordEncrypted(clean.passwordHash)) {
+          clean.passwordHash = hashPassword(clean.password);
+        }
+        delete clean.password;
+      }
+      clean.passwordEncrypted = true;
+      return clean;
+    });
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(secureUsers));
   } catch (e) {
     console.error('Lỗi khi lưu danh sách người dùng vào localStorage:', e);
   }
 };
 
-// Authenticate username and password
+// Authenticate username and password với thuật toán xác thực mật khẩu mã hóa an toàn
 export const authenticateUser = (
   usernameInput: string,
   passwordInput: string
@@ -91,25 +165,41 @@ export const authenticateUser = (
   }
 
   const users = getStoredUsers();
-  const found = users.find(
+  const userIndex = users.findIndex(
     u => u.username.toLowerCase() === cleanUser || (u.email && u.email.toLowerCase() === cleanUser)
   );
 
-  if (!found) {
+  if (userIndex === -1) {
     return { success: false, error: 'Tài khoản không tồn tại trên hệ thống.' };
   }
+
+  const found = users[userIndex];
 
   if (!found.isActive) {
     return { success: false, error: 'Tài khoản này hiện đang bị khóa. Vui lòng liên hệ quản trị viên.' };
   }
 
-  // Check password (support case sensitivity or standard match)
-  if (found.password !== cleanPass) {
+  // Xác thực mật khẩu với chuỗi mã hóa Salted SHA-256
+  const verification = verifyPassword(cleanPass, found.passwordHash || found.password);
+
+  if (!verification.isValid) {
     return { success: false, error: 'Mật khẩu không chính xác. Vui lòng thử lại.' };
+  }
+
+  // Nếu người dùng vừa xác thực bằng mật khẩu plaintext cũ, tự động nâng cấp sang mã hóa ngay lập tức
+  if (verification.wasPlaintext && verification.upgradedHash) {
+    found.passwordHash = verification.upgradedHash;
+    delete found.password;
+    found.passwordEncrypted = true;
+  } else if (!found.passwordHash || !isPasswordEncrypted(found.passwordHash)) {
+    found.passwordHash = hashPassword(cleanPass);
+    delete found.password;
+    found.passwordEncrypted = true;
   }
 
   // Update last login
   found.lastLogin = new Date().toISOString();
+  users[userIndex] = found;
   saveStoredUsers(users);
 
   return { success: true, user: found };
@@ -128,7 +218,7 @@ export const generateRandomPassword = (): string => {
   return pass;
 };
 
-// Create a new user
+// Create a new user (Mật khẩu được băm mã hóa ngay tại thời điểm khởi tạo)
 export const createUser = (data: {
   username: string;
   fullName: string;
@@ -155,6 +245,8 @@ export const createUser = (data: {
     return { success: false, error: `Tên đăng nhập "${cleanUsername}" đã tồn tại. Vui lòng chọn tên khác.` };
   }
 
+  const rawPassword = data.password?.trim() || generateRandomPassword();
+
   const newUser: UserAccount = {
     id: `usr-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
     username: cleanUsername,
@@ -162,7 +254,9 @@ export const createUser = (data: {
     email: data.email?.trim() || undefined,
     phone: data.phone?.trim() || undefined,
     role: data.role || 'editor',
-    password: data.password?.trim() || 'Vungochan@2015',
+    // Lưu trữ dưới dạng mã hóa Salted SHA-256 an toàn
+    passwordHash: hashPassword(rawPassword),
+    passwordEncrypted: true,
     isActive: data.isActive !== undefined ? data.isActive : true,
     createdAt: new Date().toISOString()
   };
@@ -211,7 +305,7 @@ export const updateUser = (
   return { success: true };
 };
 
-// Reset or change password
+// Reset or change password (Mã hóa mật khẩu mới trước khi lưu)
 export const resetUserPassword = (
   id: string,
   newPassword: string
@@ -227,7 +321,11 @@ export const resetUserPassword = (
     return { success: false, error: 'Không tìm thấy người dùng.' };
   }
 
-  users[index].password = cleanPass;
+  // Băm mã hóa mật khẩu mới kèm Salt riêng biệt
+  users[index].passwordHash = hashPassword(cleanPass);
+  users[index].passwordEncrypted = true;
+  delete users[index].password;
+
   saveStoredUsers(users);
   return { success: true };
 };

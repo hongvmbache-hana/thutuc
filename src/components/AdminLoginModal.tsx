@@ -29,7 +29,7 @@ export default function AdminLoginModal({
     const cleanUser = username.trim();
     const cleanPass = password.trim();
 
-    // Check with centralized user authentication
+    // Check with centralized user authentication (Using Salted SHA-256 password hashing)
     const authResult = authenticateUser(cleanUser, cleanPass);
 
     if (authResult.success && authResult.user) {
@@ -47,25 +47,7 @@ export default function AdminLoginModal({
       return;
     }
 
-    // Fallback legacy test credentials
-    const isHongvm = (cleanUser.toLowerCase() === 'hongvm' || cleanUser.toLowerCase() === 'hongvm.bache@gmail.com') && 
-                     (cleanPass === 'Vungochan@2015' || cleanPass === 'vungochan@2015');
-    const isAdmin = cleanUser.toLowerCase() === 'admin' && 
-                    (cleanPass === 'Vungochan@2015' || cleanPass === 'vungochan@2015' || cleanPass === 'admin@2026' || cleanPass === '123456');
-
-    if (isHongvm || isAdmin) {
-      const displayName = isHongvm ? 'Hongvm (Quản trị viên)' : 'Admin Quản trị';
-      localStorage.setItem('tthc_is_admin_logged_in', 'true');
-      localStorage.setItem('tthc_admin_username', isHongvm ? 'hongvm' : 'admin');
-      localStorage.setItem('tthc_admin_fullname', displayName);
-      localStorage.setItem('tthc_admin_role', 'admin');
-      setError(null);
-      onLoginSuccess(displayName);
-      onShowToast(`Đăng nhập thành công! Quyền quản trị viên đã kích hoạt (${displayName}).`, 'success');
-      onClose();
-    } else {
-      setError(authResult.error || 'Tên đăng nhập hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại!');
-    }
+    setError(authResult.error || 'Tên đăng nhập hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại!');
   };
 
   return (

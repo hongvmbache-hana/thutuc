@@ -103,16 +103,46 @@ export const getDepartmentHeader = (procs: Procedure[]): string => {
   return `THỦ TỤC HÀNH CHÍNH CẤP XÃ`;
 };
 
+export interface ExcelExportOptions {
+  sheetMode?: 'all_and_split' | 'split_only' | 'single_sheet';
+  customHeaderTitle?: string;
+  customCategoryTitle?: string;
+  fileName?: string;
+  onProgress?: (current: number, total: number, message: string) => void;
+}
+
 // Export procedures to Excel with real QR code images and columns: STT, MÃ TTHC, TÊN THỦ TỤC HÀNH CHÍNH, MÃ QRCODE
-export async function exportProceduresToExcelWithQr(procedures: Procedure[], settings?: AppSettings): Promise<void> {
+export async function exportProceduresToExcelWithQr(
+  procedures: Procedure[],
+  settings?: AppSettings,
+  options?: ExcelExportOptions
+): Promise<void> {
   if (procedures.length === 0) {
     throw new Error('Không có dữ liệu để xuất file!');
   }
 
-  // 1. Pre-generate all QR codes asynchronously
+  const {
+    sheetMode = 'all_and_split',
+    customHeaderTitle,
+    customCategoryTitle,
+    fileName,
+    onProgress
+  } = options || {};
+
+  // 1. Pre-generate all QR codes asynchronously with progress report
+  const totalProcs = procedures.length;
   const qrCodeMap: { [id: string]: string } = {};
-  for (const p of procedures) {
+
+  for (let i = 0; i < totalProcs; i++) {
+    const p = procedures[i];
+    if (onProgress) {
+      onProgress(i + 1, totalProcs, `Đang tạo mã QR cho thủ tục (${i + 1}/${totalProcs})...`);
+    }
     qrCodeMap[p.id] = await generateQrDataUrl(p);
+  }
+
+  if (onProgress) {
+    onProgress(totalProcs, totalProcs, 'Đang khởi tạo cấu trúc bảng tính Excel...');
   }
 
   // 2. Group procedures by Lĩnh vực
@@ -175,29 +205,31 @@ export async function exportProceduresToExcelWithQr(procedures: Procedure[], set
       };
     });
 
-    worksheet.mergeCells('A5:D5');
-    const catCell = worksheet.getCell('A5');
-    catCell.value = categoryTitle.toUpperCase();
-    catCell.font = { name: 'Times New Roman', size: 11, bold: true, italic: true };
-    catCell.alignment = { horizontal: 'center', vertical: 'middle' };
-    worksheet.getRow(5).height = 24;
+    if (categoryTitle) {
+      worksheet.mergeCells('A5:D5');
+      const catCell = worksheet.getCell('A5');
+      catCell.value = categoryTitle.toUpperCase();
+      catCell.font = { name: 'Times New Roman', size: 11, bold: true, italic: true };
+      catCell.alignment = { horizontal: 'center', vertical: 'middle' };
+      worksheet.getRow(5).height = 24;
 
-    ['A5', 'B5', 'C5', 'D5'].forEach(ref => {
-      const c = worksheet.getCell(ref);
-      c.border = {
-        top: { style: 'thin', color: { argb: 'FF000000' } },
-        left: { style: 'thin', color: { argb: 'FF000000' } },
-        bottom: { style: 'thin', color: { argb: 'FF000000' } },
-        right: { style: 'thin', color: { argb: 'FF000000' } }
-      };
-      c.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFF9FAFB' }
-      };
-    });
+      ['A5', 'B5', 'C5', 'D5'].forEach(ref => {
+        const c = worksheet.getCell(ref);
+        c.border = {
+          top: { style: 'thin', color: { argb: 'FF000000' } },
+          left: { style: 'thin', color: { argb: 'FF000000' } },
+          bottom: { style: 'thin', color: { argb: 'FF000000' } },
+          right: { style: 'thin', color: { argb: 'FF000000' } }
+        };
+        c.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFF9FAFB' }
+        };
+      });
+    }
 
-    let currentRowIndex = 6;
+    let currentRowIndex = categoryTitle ? 6 : 5;
     procs.forEach((p, idx) => {
       const row = worksheet.getRow(currentRowIndex);
       row.height = 95;
@@ -252,17 +284,31 @@ export async function exportProceduresToExcelWithQr(procedures: Procedure[], set
 
   const sortedFieldKeys = Object.keys(fieldGroups).sort();
 
-  sortedFieldKeys.forEach(lv => {
-    const procsInField = fieldGroups[lv];
-    const tabName = sanitizeSheetName(lv, usedSheetNames);
-    const deptTitle = getDepartmentHeader(procsInField);
-    createStandardSheet(tabName, deptTitle, `LĨNH VỰC ${lv}`, procsInField);
-  });
+  if (sheetMode === 'single_sheet') {
+    // Single sheet mode: merge all selected procedures into one worksheet
+    const tabName = sanitizeSheetName('Danh sách TTHC', usedSheetNames);
+    const title = customHeaderTitle || (settings?.siteTitle ? `${settings.siteTitle} - THỦ TỤC HÀNH CHÍNH CẤP XÃ` : 'THỦ TỤC HÀNH CHÍNH CẤP XÃ');
+    const catTitle = customCategoryTitle || (sortedFieldKeys.length === 1 ? `LĨNH VỰC ${sortedFieldKeys[0]}` : 'TỔNG HỢP THỦ TỤC HÀNH CHÍNH');
+    createStandardSheet(tabName, title, catTitle, procedures);
+  } else {
+    // Create individual sheets for each field
+    sortedFieldKeys.forEach(lv => {
+      const procsInField = fieldGroups[lv];
+      const tabName = sanitizeSheetName(lv, usedSheetNames);
+      const deptTitle = customHeaderTitle || getDepartmentHeader(procsInField);
+      createStandardSheet(tabName, deptTitle, `LĨNH VỰC ${lv}`, procsInField);
+    });
 
-  if (sortedFieldKeys.length > 1) {
-    const tabName = sanitizeSheetName('tổng hợp', usedSheetNames);
-    const generalTitle = settings?.siteTitle ? `${settings.siteTitle} - THỦ TỤC HÀNH CHÍNH CẤP XÃ` : 'THỦ TỤC HÀNH CHÍNH CẤP XÃ';
-    createStandardSheet(tabName, generalTitle, 'TỔNG HỢP TẤT CẢ LĨNH VỰC', procedures);
+    // Also create a "tổng hợp" sheet if mode is 'all_and_split' and multiple fields
+    if (sheetMode === 'all_and_split' && sortedFieldKeys.length > 1) {
+      const tabName = sanitizeSheetName('tổng hợp', usedSheetNames);
+      const generalTitle = customHeaderTitle || (settings?.siteTitle ? `${settings.siteTitle} - THỦ TỤC HÀNH CHÍNH CẤP XÃ` : 'THỦ TỤC HÀNH CHÍNH CẤP XÃ');
+      createStandardSheet(tabName, generalTitle, 'TỔNG HỢP TẤT CẢ LĨNH VỰC', procedures);
+    }
+  }
+
+  if (onProgress) {
+    onProgress(totalProcs, totalProcs, 'Đang đóng gói và tải tệp Excel...');
   }
 
   const buffer = await workbook.xlsx.writeBuffer();
@@ -271,8 +317,9 @@ export async function exportProceduresToExcelWithQr(procedures: Procedure[], set
 
   const link = document.createElement('a');
   const today = new Date().toISOString().substring(0, 10);
+  const finalFileName = fileName ? (fileName.endsWith('.xlsx') ? fileName : `${fileName}.xlsx`) : `So_tay_TTHC_QRCode_${today}.xlsx`;
   link.setAttribute('href', url);
-  link.setAttribute('download', `So_tay_TTHC_QRCode_${today}.xlsx`);
+  link.setAttribute('download', finalFileName);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);

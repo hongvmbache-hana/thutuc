@@ -276,6 +276,25 @@ export default function UserManagementTab({ onShowToast, currentUsername }: User
             </span>
           </div>
         </div>
+
+        {/* Security Status Card */}
+        <div className="mt-3.5 bg-emerald-950/40 border border-emerald-500/30 rounded-xl p-3 flex items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5 text-emerald-200">
+            <div className="p-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg shrink-0">
+              <ShieldCheck className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="font-bold text-emerald-300">Chế độ mã hóa mật khẩu: Đang kích hoạt bảo vệ toàn diện</span>
+              <p className="text-[11px] text-emerald-200/80 mt-0.5">
+                Toàn bộ mật khẩu của quản trị viên và cán bộ được băm mã hóa một chiều chuẩn Salted SHA-256 (Muối ngẫu nhiên, 1.000 vòng lặp). Hệ thống cam kết không bao giờ lưu văn bản gốc (plaintext) trên bộ nhớ hay cơ sở dữ liệu.
+              </p>
+            </div>
+          </div>
+          <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-500/20 border border-emerald-400/40 rounded-full text-[10.5px] font-bold text-emerald-300 shrink-0">
+            <Lock className="w-3 h-3" />
+            <span>Salted SHA-256</span>
+          </span>
+        </div>
       </div>
 
       {/* Filter and Search Bar */}
@@ -367,9 +386,18 @@ export default function UserManagementTab({ onShowToast, currentUsername }: User
                                 </span>
                               )}
                             </div>
-                            <span className="text-[11px] font-mono text-slate-500 font-semibold block">
-                              @{user.username}
-                            </span>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="text-[11px] font-mono text-slate-500 font-semibold">
+                                @{user.username}
+                              </span>
+                              <span 
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded text-[9.5px] font-semibold"
+                                title="Mật khẩu của tài khoản này được lưu trữ dưới dạng bản băm Salted SHA-256 an toàn (Không lưu bản rõ)"
+                              >
+                                <Lock className="w-2.5 h-2.5 text-emerald-600" />
+                                <span>Mã hóa SHA-256</span>
+                              </span>
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -678,6 +706,12 @@ export default function UserManagementTab({ onShowToast, currentUsername }: User
                 <p className="text-[10.5px] text-amber-800">
                   Hãy sao chép và gửi mật khẩu này cho cán bộ để đăng nhập lần đầu.
                 </p>
+                <div className="p-2 bg-emerald-50 rounded-lg border border-emerald-200 flex items-start gap-1.5 text-emerald-900 text-[10.5px] leading-relaxed">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Cơ chế mã hóa bảo mật:</strong> Mật khẩu chỉ hiển thị tại bước này để sao chép. Khi bấm Tạo tài khoản, mật khẩu sẽ được băm mã hóa một chiều Salted SHA-256 an toàn và tự hủy bản rõ.
+                  </span>
+                </div>
               </div>
 
               {/* Active Switch */}
@@ -791,8 +825,11 @@ export default function UserManagementTab({ onShowToast, currentUsername }: User
                 <span className="text-[10.5px] text-slate-500">Tối thiểu từ 6 ký tự trở lên</span>
               </div>
 
-              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 text-[11px] leading-relaxed">
-                Sau khi xác nhận, người dùng này sẽ đăng nhập bằng mật khẩu mới này. Vui lòng bấm biểu tượng sao chép để gửi mật khẩu cho cán bộ.
+              <div className="p-2.5 bg-emerald-50 rounded-xl border border-emerald-200 text-emerald-950 text-[11px] leading-relaxed flex items-start gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                <div>
+                  <strong>Bảo mật mật khẩu:</strong> Mật khẩu mới sẽ được mã hóa an toàn một chiều (Salted SHA-256) ngay khi lưu. Vui lòng sao chép để gửi cho cán bộ trước khi hoàn tất.
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">

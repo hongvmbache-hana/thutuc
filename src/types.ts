@@ -41,7 +41,9 @@ export interface UserAccount {
   email?: string;
   phone?: string;
   role: UserRole; // 'admin': Quản trị viên tối cao, 'editor': Cán bộ nghiệp vụ (Thêm, Sửa, Xóa TTHC), 'viewer': Cán bộ tra cứu
-  password?: string;
+  passwordHash?: string; // Mật khẩu đã mã hóa một chiều Salted SHA-256 an toàn
+  password?: string; // Hỗ trợ tương thích ngược trước khi nâng cấp tự động sang passwordHash
+  passwordEncrypted?: boolean; // Đánh dấu trạng thái mật khẩu đã được mã hóa
   isActive: boolean;
   createdAt: string;
   lastLogin?: string;

@@ -3,6 +3,7 @@ import { Procedure, AppSettings } from '../types';
 import { FileSpreadsheet, Printer, Loader2, QrCode } from 'lucide-react';
 import QRCode from 'qrcode';
 import ExcelJS from 'exceljs';
+import ExportExcelQrModal from './ExportExcelQrModal';
 
 interface ExportButtonProps {
   procedures: Procedure[];
@@ -11,6 +12,7 @@ interface ExportButtonProps {
 }
 
 export default function ExportButton({ procedures, activeTableName = "Danh sách Thủ tục", settings }: ExportButtonProps) {
+  const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
   const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
 
@@ -610,50 +612,51 @@ export default function ExportButton({ procedures, activeTableName = "Danh sách
   };
 
   return (
-    <div className="flex items-center gap-2">
-      {/* Excel (.xlsx) Download with QR Codes and Field Sheets */}
-      <button
-        type="button"
-        onClick={handleExportExcel}
-        disabled={isExportingExcel || procedures.length === 0}
-        className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 disabled:bg-emerald-400 text-white rounded-lg text-xs font-bold shadow transition-all cursor-pointer disabled:cursor-not-allowed active:scale-95"
-        id="export-excel-button"
-        title="Xuất file Excel (.xlsx) định dạng bảng kèm Mã QR Code và chia Sheet theo Lĩnh vực"
-      >
-        {isExportingExcel ? (
-          <>
-            <Loader2 className="w-4 h-4 animate-spin" />
-            <span>Đang tạo Excel & QR...</span>
-          </>
-        ) : (
-          <>
-            <FileSpreadsheet className="w-4 h-4" />
-            <span>Xuất Excel (Kèm QR)</span>
-          </>
-        )}
-      </button>
+    <>
+      <div className="flex items-center gap-2">
+        {/* Excel (.xlsx) Download with QR Codes and Field Sheets */}
+        <button
+          type="button"
+          onClick={() => setIsExcelModalOpen(true)}
+          disabled={procedures.length === 0}
+          className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 disabled:bg-emerald-400 text-white rounded-lg text-xs font-bold shadow transition-all cursor-pointer disabled:cursor-not-allowed active:scale-95"
+          id="export-excel-button"
+          title="Mở popup tùy chọn xuất Excel (.xlsx) kèm Mã QR Code, lọc theo Bộ ngành và Lĩnh vực riêng"
+        >
+          <FileSpreadsheet className="w-4 h-4" />
+          <span>Xuất Excel (Kèm QR)</span>
+        </button>
 
-      {/* PDF Print / Export with QR Codes */}
-      <button
-        type="button"
-        onClick={handlePrintPDF}
-        disabled={isExportingPdf || procedures.length === 0}
-        className="flex items-center gap-1.5 px-3.5 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 text-white rounded-lg text-xs font-bold shadow transition-all cursor-pointer disabled:cursor-not-allowed active:scale-95"
-        id="export-pdf-button"
-        title="In hoặc lưu file PDF mẫu 3 cột chuẩn kèm mã QR Code tra cứu"
-      >
-        {isExportingPdf ? (
-          <>
-            <Loader2 className="w-4 h-4 animate-spin" />
-            <span>Đang tạo bản in...</span>
-          </>
-        ) : (
-          <>
-            <Printer className="w-4 h-4" />
-            <span>In / Xuất PDF (Kèm QR)</span>
-          </>
-        )}
-      </button>
-    </div>
+        {/* PDF Print / Export with QR Codes */}
+        <button
+          type="button"
+          onClick={handlePrintPDF}
+          disabled={isExportingPdf || procedures.length === 0}
+          className="flex items-center gap-1.5 px-3.5 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 text-white rounded-lg text-xs font-bold shadow transition-all cursor-pointer disabled:cursor-not-allowed active:scale-95"
+          id="export-pdf-button"
+          title="In hoặc lưu file PDF mẫu 3 cột chuẩn kèm mã QR Code tra cứu"
+        >
+          {isExportingPdf ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Đang tạo bản in...</span>
+            </>
+          ) : (
+            <>
+              <Printer className="w-4 h-4" />
+              <span>In / Xuất PDF (Kèm QR)</span>
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* Popup modal xuất Excel kèm QR theo Bộ ngành, Lĩnh vực */}
+      <ExportExcelQrModal
+        isOpen={isExcelModalOpen}
+        onClose={() => setIsExcelModalOpen(false)}
+        procedures={procedures}
+        settings={settings}
+      />
+    </>
   );
 }

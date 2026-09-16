@@ -31,6 +31,7 @@ import QRCode from 'qrcode';
 import { Procedure, AppSettings } from '../types';
 import { syncDataToServer, fetchServerData } from '../services/apiSync';
 import { exportProceduresToExcelWithQr } from '../utils/excelExportHelper';
+import ExportExcelQrModal from './ExportExcelQrModal';
 
 interface OnlineSpreadsheetModalProps {
   isOpen: boolean;
@@ -80,6 +81,7 @@ export default function OnlineSpreadsheetModal({
   const [isPasteModalOpen, setIsPasteModalOpen] = useState(false);
   const [pasteRawText, setPasteRawText] = useState('');
   const [copiedFormula, setCopiedFormula] = useState(false);
+  const [isExportQrModalOpen, setIsExportQrModalOpen] = useState(false);
 
   // Synchronize when procedures prop changes from web UI (unless user is actively typing unsaved changes)
   useEffect(() => {
@@ -639,9 +641,9 @@ export default function OnlineSpreadsheetModal({
             {/* Export Excel with QR */}
             <button
               type="button"
-              onClick={handleExportExcelWithQr}
+              onClick={() => setIsExportQrModalOpen(true)}
               className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-xs font-bold shadow-xs cursor-pointer transition-colors"
-              title="Xuất file Excel (.xlsx) kèm hình ảnh mã QR thực tế và cột Mã TTHC chuẩn"
+              title="Mở bảng tùy chọn xuất Excel (.xlsx) kèm Mã QR Code, lọc theo Bộ ngành, Lĩnh vực"
             >
               <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-700" />
               <span>Xuất Excel (Kèm QR)</span>
@@ -1381,6 +1383,14 @@ export default function OnlineSpreadsheetModal({
           </div>
         </div>
       )}
+
+      {/* Popup modal xuất Excel kèm QR có lọc theo Bộ ngành, Lĩnh vực */}
+      <ExportExcelQrModal
+        isOpen={isExportQrModalOpen}
+        onClose={() => setIsExportQrModalOpen(false)}
+        procedures={gridData}
+        settings={settings}
+      />
 
     </div>
   );
