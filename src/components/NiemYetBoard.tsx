@@ -41,6 +41,7 @@ interface NiemYetBoardProps {
   settings: AppSettings;
   onViewProcedureDetail?: (procedure: Procedure) => void;
   onOpenManagementTab?: () => void;
+  onSaveSettings?: (settings: AppSettings) => void;
 }
 
 // Smart mapping helper for field to Ministry / Department
@@ -115,30 +116,34 @@ export default function NiemYetBoard({
   procedures,
   settings,
   onViewProcedureDetail,
-  onOpenManagementTab
+  onOpenManagementTab,
+  onSaveSettings
 }: NiemYetBoardProps) {
-  // Load configuration from localStorage
+  // Load configuration from localStorage, prioritizing settings if customized
   const [config, setConfig] = useState<NiemYetConfig>(() => {
+    let baseConfig = { ...DEFAULT_NIEM_YET_CONFIG };
     const saved = localStorage.getItem('tthc_niemyet_config');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        return { 
-          ...DEFAULT_NIEM_YET_CONFIG, 
+        baseConfig = { 
+          ...baseConfig, 
           ...parsed,
           cardShape: parsed.cardShape === 'elongated' ? 'a4' : (parsed.cardShape || 'a4')
         };
-      } catch (e) {
-        return DEFAULT_NIEM_YET_CONFIG;
-      }
+      } catch (e) {}
     }
-    return DEFAULT_NIEM_YET_CONFIG;
-  });
 
-  const saveConfig = (newConfig: NiemYetConfig) => {
-    setConfig(newConfig);
-    localStorage.setItem('tthc_niemyet_config', JSON.stringify(newConfig));
-  };
+    // Nếu settings có cấu hình tiêu đề niêm yết tùy biến
+    if (settings.kioskBannerTitle) {
+      baseConfig.displayTitle = settings.kioskBannerTitle;
+    }
+    if (settings.kioskBannerSubtitle || settings.agencyName) {
+      baseConfig.subTitle = settings.kioskBannerSubtitle || settings.agencyName || baseConfig.subTitle;
+    }
+
+    return baseConfig;
+  });
 
   // State
   const [currentTime, setCurrentTime] = useState<string>('');
@@ -155,8 +160,59 @@ export default function NiemYetBoard({
   const [selectedProcedureForQr, setSelectedProcedureForQr] = useState<Procedure | null>(null);
   const [qrCodeModalDataUrl, setQrCodeModalDataUrl] = useState<string>('');
   const [previewDetailProcedure, setPreviewDetailProcedure] = useState<Procedure | null>(null);
-  const [selectedQnUnitId, setSelectedQnUnitId] = useState<string>('x_ba_che');
+
+  // Đơn vị hành chính được chọn (54 xã, phường, đặc khu Quảng Ninh)
+  const [selectedQnUnitId, setSelectedQnUnitId] = useState<string>(() => {
+    if (settings.selectedUnitId) return settings.selectedUnitId;
+    const currentSub = settings.kioskBannerSubtitle || settings.agencyName || config.subTitle || '';
+    if (currentSub) {
+      const found = QUANG_NINH_54_UNITS.find(u => 
+        currentSub.toUpperCase().includes(u.name.toUpperCase()) || 
+        u.agencyName.toUpperCase() === currentSub.toUpperCase()
+      );
+      if (found) return found.id;
+    }
+    return 'x_ba_che';
+  });
   const [filterUnitType, setFilterUnitType] = useState<'all' | 'phuong' | 'xa' | 'dackhu'>('all');
+
+  // Hàm lưu cấu hình: Lưu vào LocalStorage đồng thời đồng bộ ngay sang AppSettings và máy chủ online
+  const saveConfig = (newConfig: NiemYetConfig, newUnitId?: string) => {
+    setConfig(newConfig);
+    try {
+      localStorage.setItem('tthc_niemyet_config', JSON.stringify(newConfig));
+    } catch (e) {
+      console.warn('Lỗi lưu cache tthc_niemyet_config:', e);
+    }
+
+    const unitToSave = newUnitId || selectedQnUnitId;
+
+    if (onSaveSettings) {
+      const updatedSettings: AppSettings = {
+        ...settings,
+        kioskBannerTitle: newConfig.displayTitle || 'BẢNG NIÊM YẾT THỦ TỤC HÀNH CHÍNH',
+        kioskBannerSubtitle: newConfig.subTitle || 'TRUNG TÂM PHỤC VỤ HÀNH CHÍNH CÔNG XÃ BA CHẼ',
+        agencyName: newConfig.subTitle || 'TRUNG TÂM PHỤC VỤ HÀNH CHÍNH CÔNG XÃ BA CHẼ',
+        selectedUnitId: unitToSave,
+        isCustomized: true
+      };
+      onSaveSettings(updatedSettings);
+    }
+  };
+
+  // Đồng bộ hai chiều khi settings từ props thay đổi (khi sửa ở tab Kiosk hoặc nạp từ máy chủ)
+  useEffect(() => {
+    if (settings.kioskBannerTitle && settings.kioskBannerTitle !== config.displayTitle) {
+      setConfig(prev => ({ ...prev, displayTitle: settings.kioskBannerTitle! }));
+    }
+    const currentAgency = settings.kioskBannerSubtitle || settings.agencyName;
+    if (currentAgency && currentAgency !== config.subTitle) {
+      setConfig(prev => ({ ...prev, subTitle: currentAgency }));
+    }
+    if (settings.selectedUnitId && settings.selectedUnitId !== selectedQnUnitId) {
+      setSelectedQnUnitId(settings.selectedUnitId);
+    }
+  }, [settings.kioskBannerTitle, settings.kioskBannerSubtitle, settings.agencyName, settings.selectedUnitId]);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -442,7 +498,7 @@ export default function NiemYetBoard({
                 }`}
                 style={{ fontFamily: '"Times New Roman", Times, "Tinos", serif' }}
               >
-                {settings.kioskBannerTitle || config.displayTitle || 'BẢNG NIÊM YẾT THỦ TỤC HÀNH CHÍNH'}
+                {config.displayTitle || settings.kioskBannerTitle || 'BẢNG NIÊM YẾT THỦ TỤC HÀNH CHÍNH'}
               </h1>
               <p 
                 className={`text-xs sm:text-sm font-bold uppercase tracking-wide mt-0.5 font-times select-text ${
@@ -450,7 +506,7 @@ export default function NiemYetBoard({
                 }`}
                 style={{ fontFamily: '"Times New Roman", Times, "Tinos", serif' }}
               >
-                {settings.kioskBannerSubtitle || config.subTitle || 'TRUNG TÂM PHỤC VỤ HÀNH CHÍNH CÔNG XÃ BA CHẼ'}
+                {config.subTitle || settings.kioskBannerSubtitle || settings.agencyName || 'TRUNG TÂM PHỤC VỤ HÀNH CHÍNH CÔNG XÃ BA CHẼ'}
               </p>
               {settings.kioskBannerSlogan && (
                 <p className={`text-[11px] font-medium italic mt-0.5 select-text ${
@@ -1569,7 +1625,7 @@ export default function NiemYetBoard({
                           setSelectedQnUnitId(unitId);
                           const found = QUANG_NINH_54_UNITS.find(u => u.id === unitId);
                           if (found) {
-                            saveConfig({ ...config, subTitle: found.agencyName });
+                            saveConfig({ ...config, subTitle: found.agencyName }, unitId);
                           }
                         }}
                         className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-800 focus:bg-white focus:outline-none focus:border-red-600 cursor-pointer"
@@ -1592,7 +1648,7 @@ export default function NiemYetBoard({
                           <select
                             onChange={(e) => {
                               if (e.target.value) {
-                                saveConfig({ ...config, subTitle: e.target.value });
+                                saveConfig({ ...config, subTitle: e.target.value }, selectedQnUnitId);
                               }
                             }}
                             defaultValue=""
@@ -1618,10 +1674,14 @@ export default function NiemYetBoard({
                     <input
                       type="text"
                       value={config.subTitle}
-                      onChange={(e) => saveConfig({ ...config, subTitle: e.target.value })}
+                      onChange={(e) => saveConfig({ ...config, subTitle: e.target.value }, selectedQnUnitId)}
                       className="w-full px-3 py-1.5 border border-red-300 focus:border-red-600 rounded-lg text-xs font-bold bg-white text-slate-900 focus:outline-none"
                       placeholder="TRUNG TÂM PHỤC VỤ HÀNH CHÍNH CÔNG XÃ BA CHẼ"
                     />
+                    <div className="flex items-center gap-1.5 mt-1 text-[10px] text-emerald-700 font-semibold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                      <span>Tự động lưu vào bộ nhớ cache trình duyệt & đồng bộ lên máy chủ web online</span>
+                    </div>
                   </div>
                 </div>
               </div>

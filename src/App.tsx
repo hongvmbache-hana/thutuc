@@ -14,7 +14,8 @@ import AdminLoginModal from './components/AdminLoginModal';
 import NiemYetBoard from './components/NiemYetBoard';
 import { getProcedureTrangThai } from './utils/bienDongHelper';
 import { fetchOnlineSpreadsheet, parseSpreadsheetBuffer } from './utils/onlineExcelSync';
-import { fetchServerData, syncDataToServer, resetServerData } from './services/apiSync';
+import { fetchServerData, syncDataToServer, syncSettingsToServer, syncUsersToServer, resetServerData } from './services/apiSync';
+import { getStoredUsers, saveStoredUsers } from './utils/userManagement';
 import { 
   Building2, 
   MapPin, 
@@ -130,23 +131,53 @@ export default function App() {
     return true;
   };
 
-  // Load general web settings
+  // Load general web settings (Bảo tồn cấu hình người dùng từ cả tthc_app_settings và tthc_niemyet_config)
   const [settings, setSettings] = useState<AppSettings>(() => {
+    let result = { ...DEFAULT_APP_SETTINGS };
     const saved = localStorage.getItem('tthc_app_settings');
     if (saved) {
       try {
-        return JSON.parse(saved);
-      } catch (e) {
-        return DEFAULT_APP_SETTINGS;
-      }
+        result = { ...result, ...JSON.parse(saved) };
+      } catch (e) {}
     }
-    return DEFAULT_APP_SETTINGS;
+    // Bảo toàn nếu người dùng đã cấu hình tên cơ quan ở tthc_niemyet_config
+    const savedNiemYet = localStorage.getItem('tthc_niemyet_config');
+    if (savedNiemYet) {
+      try {
+        const parsedNy = JSON.parse(savedNiemYet);
+        if (parsedNy.displayTitle && (!saved || !result.kioskBannerTitle)) {
+          result.kioskBannerTitle = parsedNy.displayTitle;
+        }
+        if (parsedNy.subTitle && (!saved || !result.kioskBannerSubtitle)) {
+          result.kioskBannerSubtitle = parsedNy.subTitle;
+          result.agencyName = parsedNy.subTitle;
+        }
+      } catch (e) {}
+    }
+    return result;
   });
 
   const handleSaveSettings = (newSettings: AppSettings) => {
     setSettings(newSettings);
+    // Lưu vào bộ nhớ cache trình duyệt
     localStorage.setItem('tthc_app_settings', JSON.stringify(newSettings));
+    try {
+      const savedConfig = localStorage.getItem('tthc_niemyet_config');
+      const parsed = savedConfig ? JSON.parse(savedConfig) : {};
+      localStorage.setItem('tthc_niemyet_config', JSON.stringify({
+        ...parsed,
+        displayTitle: newSettings.kioskBannerTitle || parsed.displayTitle,
+        subTitle: newSettings.kioskBannerSubtitle || newSettings.agencyName || parsed.subTitle
+      }));
+    } catch (e) {}
+
     setIsServerSyncing(true);
+
+    // 1. Đồng bộ tức thời cấu hình riêng biệt lên endpoint chuyên biệt
+    syncSettingsToServer(newSettings, localStorage.getItem('tthc_admin_username') || 'Admin')
+      .catch(err => console.warn('Lỗi đồng bộ syncSettingsToServer:', err));
+
+    // 2. Đồng bộ toàn bộ dữ liệu lên máy chủ dùng chung
     syncDataToServer({
       procedures,
       linhVucPresets,
@@ -315,9 +346,55 @@ export default function App() {
           localStorage.setItem('tthc_so_nganh_presets', JSON.stringify(serverRes.soNganhPresets));
         }
 
-        if (serverRes.settings) {
+        // Xử lý nạp và bảo tồn cấu hình đơn vị xã/phường (Settings Cache & Cloud Sync)
+        const localSettingsRaw = localStorage.getItem('tthc_app_settings');
+        let localSettings: AppSettings | null = null;
+        if (localSettingsRaw) {
+          try { localSettings = JSON.parse(localSettingsRaw); } catch (e) {}
+        }
+
+        // Kiểm tra xem cấu hình cục bộ trong bộ nhớ cache có phải đã được người dùng tùy biến không
+        const isLocalCustomized = localSettings && (
+          localSettings.isCustomized === true ||
+          (localSettings.kioskBannerSubtitle && !localSettings.kioskBannerSubtitle.toUpperCase().includes('XÃ BA CHẼ')) ||
+          (localSettings.agencyName && !localSettings.agencyName.toUpperCase().includes('XÃ BA CHẼ')) ||
+          (localSettings.selectedUnitId && localSettings.selectedUnitId !== 'x_ba_che')
+        );
+
+        const isServerCustomized = serverRes.settings && (
+          serverRes.settings.isCustomized === true ||
+          (serverRes.settings.kioskBannerSubtitle && !serverRes.settings.kioskBannerSubtitle.toUpperCase().includes('XÃ BA CHẼ')) ||
+          (serverRes.settings.agencyName && !serverRes.settings.agencyName.toUpperCase().includes('XÃ BA CHẼ')) ||
+          (serverRes.settings.selectedUnitId && serverRes.settings.selectedUnitId !== 'x_ba_che')
+        );
+
+        if (isLocalCustomized && !isServerCustomized) {
+          // Bảo tồn cấu hình xã/phường người dùng đã chọn trong bộ nhớ cache và đẩy ngay lên máy chủ online
+          console.log('[ĐỒNG BỘ CẤU HÌNH] Bảo toàn cấu hình tùy biến từ bộ nhớ cache và đẩy lên máy chủ online...');
+          syncSettingsToServer(localSettings!, localStorage.getItem('tthc_admin_username') || 'Admin (Đồng bộ từ bộ nhớ cache)');
+          setSettings(localSettings!);
+        } else if (serverRes.settings) {
           setSettings(serverRes.settings);
           localStorage.setItem('tthc_app_settings', JSON.stringify(serverRes.settings));
+          try {
+            const currentNiemYetRaw = localStorage.getItem('tthc_niemyet_config');
+            const currentNiemYet = currentNiemYetRaw ? JSON.parse(currentNiemYetRaw) : {};
+            localStorage.setItem('tthc_niemyet_config', JSON.stringify({
+              ...currentNiemYet,
+              displayTitle: serverRes.settings.kioskBannerTitle || currentNiemYet.displayTitle || 'BẢNG NIÊM YẾT THỦ TỤC HÀNH CHÍNH',
+              subTitle: serverRes.settings.kioskBannerSubtitle || serverRes.settings.agencyName || currentNiemYet.subTitle || 'TRUNG TÂM PHỤC VỤ HÀNH CHÍNH CÔNG XÃ BA CHẼ'
+            }));
+          } catch (e) {}
+        }
+
+        // Đồng bộ và bảo toàn danh sách tài khoản người dùng từ máy chủ & cache
+        if (serverRes.users && Array.isArray(serverRes.users) && serverRes.users.length > 0) {
+          const localUsers = getStoredUsers();
+          if (localUsers.length > serverRes.users.length) {
+            syncUsersToServer(localUsers, 'Admin (Đồng bộ tài khoản từ bộ nhớ cache)');
+          } else {
+            saveStoredUsers(serverRes.users);
+          }
         }
 
         setServerLastUpdated(serverRes.lastUpdated || new Date().toISOString());
@@ -1117,6 +1194,7 @@ export default function App() {
             setIsModalOpen(true);
           }}
           onOpenManagementTab={() => handleSelectMainTab('quanly')}
+          onSaveSettings={handleSaveSettings}
         />
       ) : (
         /* Tab 2: Full Data Management Dashboard */

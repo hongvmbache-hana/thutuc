@@ -147,6 +147,23 @@ export const saveStoredUsers = (users: UserAccount[]): void => {
     });
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(secureUsers));
+
+    // Tự động đồng bộ vào cơ sở dữ liệu máy chủ trung tâm để không bị mất khi deploy online
+    if (typeof fetch === 'function' && typeof window !== 'undefined') {
+      fetch('/api/tthc/sync-users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          users: secureUsers,
+          updatedBy: localStorage.getItem('tthc_admin_username') || 'Admin'
+        })
+      }).catch(err => {
+        console.warn('Đồng bộ tài khoản người dùng lên máy chủ nền:', err);
+      });
+    }
   } catch (e) {
     console.error('Lỗi khi lưu danh sách người dùng vào localStorage:', e);
   }

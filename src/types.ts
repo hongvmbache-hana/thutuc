@@ -57,6 +57,9 @@ export interface AppSettings {
   systemVersion: string;
   footerMainText: string;
   footerSubText: string;
+  agencyName?: string; // Tên cơ quan / đơn vị cấp xã, phường (ví dụ: 'TRUNG TÂM PHỤC VỤ HÀNH CHÍNH CÔNG PHƯỜNG VIỆT HƯNG')
+  selectedUnitId?: string; // ID đơn vị hành chính (ví dụ: 'p_viet_hung')
+  isCustomized?: boolean; // Đánh dấu cấu hình đã được người dùng tùy biến để không bị ghi đè bởi cấu hình mặc định
   onlineExcelUrl?: string; // Đường dẫn biểu mẫu Google Sheets / Excel Online
   onlineExcelAutoSync?: boolean; // Tự động cập nhật khi khởi động ứng dụng
   onlineExcelSyncMode?: 'merge' | 'add_only' | 'replace_all'; // Chế độ đồng bộ mặc định

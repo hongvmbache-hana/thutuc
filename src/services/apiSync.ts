@@ -1,10 +1,11 @@
-import { Procedure, AppSettings } from '../types';
+import { Procedure, AppSettings, UserAccount } from '../types';
 
 export interface ServerSyncPayload {
   procedures: Procedure[];
   linhVucPresets: string[];
   soNganhPresets: string[];
   settings: AppSettings;
+  users?: UserAccount[];
   updatedBy?: string;
 }
 
@@ -15,6 +16,7 @@ export interface ServerSyncResponse {
   linhVucPresets?: string[];
   soNganhPresets?: string[];
   settings?: AppSettings;
+  users?: UserAccount[];
   lastUpdated?: string;
   count?: number;
 }
@@ -73,6 +75,64 @@ export async function syncDataToServer(payload: ServerSyncPayload): Promise<Serv
     return json;
   } catch (err: any) {
     console.error('Lỗi khi gửi dữ liệu lên máy chủ:', err);
+    throw err;
+  }
+}
+
+/**
+ * Pushes system and unit configuration directly to central server
+ */
+export async function syncSettingsToServer(settings: AppSettings, updatedBy?: string): Promise<ServerSyncResponse> {
+  try {
+    const res = await fetch('/api/tthc/sync-settings', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        settings,
+        updatedBy: updatedBy || 'Quản trị viên'
+      })
+    });
+
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      throw new Error(errJson.error || `Lỗi lưu cấu hình (${res.status})`);
+    }
+
+    return await res.json();
+  } catch (err: any) {
+    console.error('Lỗi khi gửi cấu hình lên máy chủ:', err);
+    throw err;
+  }
+}
+
+/**
+ * Pushes user accounts directly to central server
+ */
+export async function syncUsersToServer(users: UserAccount[], updatedBy?: string): Promise<ServerSyncResponse> {
+  try {
+    const res = await fetch('/api/tthc/sync-users', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        users,
+        updatedBy: updatedBy || 'Quản trị viên'
+      })
+    });
+
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      throw new Error(errJson.error || `Lỗi lưu người dùng (${res.status})`);
+    }
+
+    return await res.json();
+  } catch (err: any) {
+    console.error('Lỗi khi gửi danh sách người dùng lên máy chủ:', err);
     throw err;
   }
 }

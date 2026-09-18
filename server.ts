@@ -3,13 +3,15 @@ import path from 'path';
 import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { INITIAL_PROCEDURES, LINH_VUC_PRESETS, SO_NGANH_PRESETS, DEFAULT_APP_SETTINGS } from './src/mockData';
-import { Procedure, AppSettings } from './src/types';
+import { Procedure, AppSettings, UserAccount } from './src/types';
+import { DEFAULT_USERS } from './src/utils/userManagement';
 
 interface DatabaseSchema {
   procedures: Procedure[];
   linhVucPresets: string[];
   soNganhPresets: string[];
   settings: AppSettings;
+  users?: UserAccount[];
   lastUpdated: string;
   version: number;
 }
@@ -30,6 +32,7 @@ function ensureDatabase(): DatabaseSchema {
         linhVucPresets: LINH_VUC_PRESETS,
         soNganhPresets: SO_NGANH_PRESETS,
         settings: DEFAULT_APP_SETTINGS,
+        users: DEFAULT_USERS,
         lastUpdated: new Date().toISOString(),
         version: 1
       };
@@ -40,6 +43,9 @@ function ensureDatabase(): DatabaseSchema {
 
     const raw = fs.readFileSync(DB_FILE, 'utf-8');
     const parsed = JSON.parse(raw);
+    if (!parsed.users || !Array.isArray(parsed.users) || parsed.users.length === 0) {
+      parsed.users = DEFAULT_USERS;
+    }
     return parsed;
   } catch (err) {
     console.error('Lỗi khi đọc/ghi cơ sở dữ liệu:', err);
@@ -48,6 +54,7 @@ function ensureDatabase(): DatabaseSchema {
       linhVucPresets: LINH_VUC_PRESETS,
       soNganhPresets: SO_NGANH_PRESETS,
       settings: DEFAULT_APP_SETTINGS,
+      users: DEFAULT_USERS,
       lastUpdated: new Date().toISOString(),
       version: 1
     };
@@ -101,6 +108,7 @@ async function startServer() {
         linhVucPresets: db.linhVucPresets || LINH_VUC_PRESETS,
         soNganhPresets: db.soNganhPresets || SO_NGANH_PRESETS,
         settings: db.settings || DEFAULT_APP_SETTINGS,
+        users: db.users || DEFAULT_USERS,
         lastUpdated: db.lastUpdated,
         count: db.procedures ? db.procedures.length : 0
       });
@@ -112,7 +120,7 @@ async function startServer() {
   // Sync / Save dataset from Admin
   app.post('/api/tthc/sync', (req, res) => {
     try {
-      const { procedures, linhVucPresets, soNganhPresets, settings, updatedBy } = req.body;
+      const { procedures, linhVucPresets, soNganhPresets, settings, users, updatedBy } = req.body;
 
       if (!Array.isArray(procedures)) {
         return res.status(400).json({ success: false, error: 'Danh sách thủ tục không hợp lệ (cần mảng dữ liệu)' });
@@ -123,7 +131,8 @@ async function startServer() {
         procedures,
         linhVucPresets: Array.isArray(linhVucPresets) && linhVucPresets.length > 0 ? linhVucPresets : currentDb.linhVucPresets,
         soNganhPresets: Array.isArray(soNganhPresets) && soNganhPresets.length > 0 ? soNganhPresets : currentDb.soNganhPresets,
-        settings: settings || currentDb.settings,
+        settings: settings ? { ...currentDb.settings, ...settings, isCustomized: true } : currentDb.settings,
+        users: Array.isArray(users) && users.length > 0 ? users : (currentDb.users || DEFAULT_USERS),
         lastUpdated: new Date().toISOString(),
         version: (currentDb.version || 1) + 1
       };
@@ -139,11 +148,79 @@ async function startServer() {
         success: true,
         message: 'Đã lưu trữ dữ liệu tập trung lên máy chủ thành công',
         count: procedures.length,
+        settings: updatedDb.settings,
+        users: updatedDb.users,
         lastUpdated: updatedDb.lastUpdated
       });
     } catch (err: any) {
       console.error('Lỗi API /api/tthc/sync:', err);
       res.status(500).json({ success: false, error: err.message || 'Lỗi xử lý đồng bộ' });
+    }
+  });
+
+  // Sync / Save System & Kiosk Settings directly
+  app.post('/api/tthc/sync-settings', (req, res) => {
+    try {
+      const { settings, updatedBy } = req.body;
+      if (!settings) {
+        return res.status(400).json({ success: false, error: 'Thiếu dữ liệu cấu hình' });
+      }
+      const currentDb = ensureDatabase();
+      const updatedDb: DatabaseSchema = {
+        ...currentDb,
+        settings: {
+          ...currentDb.settings,
+          ...settings,
+          isCustomized: true
+        },
+        lastUpdated: new Date().toISOString(),
+        version: (currentDb.version || 1) + 1
+      };
+      const ok = saveDatabase(updatedDb);
+      if (!ok) {
+        return res.status(500).json({ success: false, error: 'Không thể lưu cấu hình trên máy chủ' });
+      }
+      console.log(`[CẤU HÌNH ĐƠN VỊ] Đã lưu cấu hình cơ quan/niêm yết: ${settings.agencyName || settings.kioskBannerSubtitle} bởi ${updatedBy || 'Quản trị viên'}`);
+      res.json({
+        success: true,
+        message: 'Đã lưu cấu hình đơn vị lên máy chủ thành công',
+        settings: updatedDb.settings,
+        lastUpdated: updatedDb.lastUpdated
+      });
+    } catch (err: any) {
+      console.error('Lỗi API /api/tthc/sync-settings:', err);
+      res.status(500).json({ success: false, error: err.message || 'Lỗi lưu cấu hình' });
+    }
+  });
+
+  // Sync / Save User Accounts directly
+  app.post('/api/tthc/sync-users', (req, res) => {
+    try {
+      const { users, updatedBy } = req.body;
+      if (!Array.isArray(users)) {
+        return res.status(400).json({ success: false, error: 'Danh sách người dùng không hợp lệ' });
+      }
+      const currentDb = ensureDatabase();
+      const updatedDb: DatabaseSchema = {
+        ...currentDb,
+        users,
+        lastUpdated: new Date().toISOString(),
+        version: (currentDb.version || 1) + 1
+      };
+      const ok = saveDatabase(updatedDb);
+      if (!ok) {
+        return res.status(500).json({ success: false, error: 'Không thể lưu danh sách người dùng trên máy chủ' });
+      }
+      console.log(`[NGƯỜI DÙNG] Đã lưu ${users.length} tài khoản người dùng bởi ${updatedBy || 'Quản trị viên'}`);
+      res.json({
+        success: true,
+        message: 'Đã lưu danh sách người dùng lên máy chủ thành công',
+        count: users.length,
+        lastUpdated: updatedDb.lastUpdated
+      });
+    } catch (err: any) {
+      console.error('Lỗi API /api/tthc/sync-users:', err);
+      res.status(500).json({ success: false, error: err.message || 'Lỗi lưu người dùng' });
     }
   });
 

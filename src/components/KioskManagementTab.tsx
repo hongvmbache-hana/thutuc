@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Monitor, 
   Layout, 
@@ -36,16 +36,40 @@ export default function KioskManagementTab({
 }: KioskManagementTabProps) {
   // Banner states
   const [bannerTitle, setBannerTitle] = useState(settings.kioskBannerTitle || 'BẢNG NIÊM YẾT THỦ TỤC HÀNH CHÍNH');
-  const [bannerSubtitle, setBannerSubtitle] = useState(settings.kioskBannerSubtitle || 'TRUNG TÂM PHỤC VỤ HÀNH CHÍNH CÔNG XÃ BA CHẼ');
+  const [bannerSubtitle, setBannerSubtitle] = useState(
+    settings.kioskBannerSubtitle || settings.agencyName || 'TRUNG TÂM PHỤC VỤ HÀNH CHÍNH CÔNG XÃ BA CHẼ'
+  );
   const [bannerSlogan, setBannerSlogan] = useState(settings.kioskBannerSlogan || 'Chuyên nghiệp - Minh bạch - Kịp thời - Hiệu quả');
   const [bannerBgColor, setBannerBgColor] = useState<'white' | 'red' | 'blue' | 'slate'>(
     settings.kioskBannerBgColor || 'white'
   );
-  const [selectedQnUnitId, setSelectedQnUnitId] = useState<string>('x_ba_che');
+  const [selectedQnUnitId, setSelectedQnUnitId] = useState<string>(() => {
+    if (settings.selectedUnitId) return settings.selectedUnitId;
+    const currentSub = settings.kioskBannerSubtitle || settings.agencyName || '';
+    if (currentSub) {
+      const found = QUANG_NINH_54_UNITS.find(u => 
+        currentSub.toUpperCase().includes(u.name.toUpperCase()) || 
+        u.agencyName.toUpperCase() === currentSub.toUpperCase()
+      );
+      if (found) return found.id;
+    }
+    return 'x_ba_che';
+  });
   const [filterUnitType, setFilterUnitType] = useState<'all' | 'phuong' | 'xa' | 'dackhu'>('all');
   const [showStatsOnClock, setShowStatsOnClock] = useState<boolean>(
     settings.kioskShowStatsOnClock !== undefined ? settings.kioskShowStatsOnClock : true
   );
+
+  // Cập nhật khi settings từ cha thay đổi (ví dụ nạp từ máy chủ hoặc khôi phục)
+  useEffect(() => {
+    if (settings.kioskBannerTitle) setBannerTitle(settings.kioskBannerTitle);
+    if (settings.kioskBannerSubtitle || settings.agencyName) {
+      setBannerSubtitle(settings.kioskBannerSubtitle || settings.agencyName || '');
+    }
+    if (settings.kioskBannerSlogan) setBannerSlogan(settings.kioskBannerSlogan);
+    if (settings.kioskBannerBgColor) setBannerBgColor(settings.kioskBannerBgColor);
+    if (settings.selectedUnitId) setSelectedQnUnitId(settings.selectedUnitId);
+  }, [settings]);
 
   // Footer states
   const [footerText, setFooterText] = useState(
@@ -70,10 +94,16 @@ export default function KioskManagementTab({
 
   // Handle Save
   const handleSave = () => {
+    const cleanBannerTitle = bannerTitle.trim() || 'BẢNG NIÊM YẾT THỦ TỤC HÀNH CHÍNH';
+    const cleanBannerSubtitle = bannerSubtitle.trim() || 'TRUNG TÂM PHỤC VỤ HÀNH CHÍNH CÔNG XÃ BA CHẼ';
+
     const updated: AppSettings = {
       ...settings,
-      kioskBannerTitle: bannerTitle.trim() || 'BẢNG NIÊM YẾT THỦ TỤC HÀNH CHÍNH',
-      kioskBannerSubtitle: bannerSubtitle.trim() || 'TRUNG TÂM PHỤC VỤ HÀNH CHÍNH CÔNG XÃ BA CHẼ',
+      kioskBannerTitle: cleanBannerTitle,
+      kioskBannerSubtitle: cleanBannerSubtitle,
+      agencyName: cleanBannerSubtitle,
+      selectedUnitId: selectedQnUnitId,
+      isCustomized: true,
       kioskBannerSlogan: bannerSlogan.trim(),
       kioskBannerBgColor: bannerBgColor,
       kioskShowStatsOnClock: showStatsOnClock,
@@ -84,7 +114,21 @@ export default function KioskManagementTab({
     };
 
     onSaveSettings(updated);
-    onShowToast('Đã lưu cấu hình Banner & Footer Kiosk thành công! Giao diện Kiosk sẽ hiển thị ngay.', 'success');
+
+    // Đồng bộ đồng thời vào bộ nhớ cache tthc_niemyet_config để màn hình Kiosk nhận ngay
+    try {
+      const savedConfig = localStorage.getItem('tthc_niemyet_config');
+      const parsed = savedConfig ? JSON.parse(savedConfig) : {};
+      localStorage.setItem('tthc_niemyet_config', JSON.stringify({
+        ...parsed,
+        displayTitle: cleanBannerTitle,
+        subTitle: cleanBannerSubtitle
+      }));
+    } catch (e) {
+      console.warn('Lỗi lưu cache tthc_niemyet_config:', e);
+    }
+
+    onShowToast(`Đã lưu cấu hình đơn vị niêm yết "${cleanBannerSubtitle}" vào bộ nhớ cache và đồng bộ lên máy chủ!`, 'success');
   };
 
   // Reset to default
