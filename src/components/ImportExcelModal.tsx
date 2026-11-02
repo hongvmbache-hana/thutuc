@@ -177,86 +177,75 @@ export default function ImportExcelModal({
         };
       }
 
-      // Sample Data Rows
-      const sampleData = [
-        [
-          1,
-          '1.000234.000.00.00.H42',
-          'Thực hiện hỗ trợ khi hòa giải viên gặp tai nạn hoặc rủi ro ảnh hưởng đến sức khỏe, tính mạng trong khi thực hiện hoạt động hòa giải',
-          'Hoà giải cơ sở',
-          'Sở Tư pháp',
-          'Cấp xã',
-          'Quyết định số 421/QĐ-VP.UBND ngày 14/01/2026',
-          'https://dichvucong.gov.vn/p/home/dvc-tthc-thu-tuc-hanh-chinh-chi-tiet.html?ma_tthc=1.000234.000.00.00.H42',
-          'Có',
-          'Có',
-          'Có',
-          'Toàn trình',
-          'Có'
-        ],
-        [
-          2,
-          '1.000235.000.00.00.H42',
-          'Thủ tục công nhận hòa giải viên',
-          'Hoà giải cơ sở',
-          'Sở Tư pháp',
-          'Cấp xã',
-          'Quyết định số 371/QĐ-UBND ngày 05/02/2021',
-          'https://dichvucong.gov.vn/p/home/dvc-tthc-thu-tuc-hanh-chinh-chi-tiet.html?ma_tthc=1.000235.000.00.00.H42',
-          'Không',
-          'Có',
-          'Có',
-          'Một phần',
-          'Không'
-        ],
-        [
-          3,
-          '1.000236.000.00.00.H42',
-          'Thủ tục công nhận tổ trưởng tổ hòa giải',
-          'Hoà giải cơ sở',
-          'Sở Tư pháp',
-          'Cấp xã',
-          'Quyết định số 371/QĐ-UBND ngày 05/02/2021',
-          'UBND Xã Ba Chẽ - Bộ phận Tư pháp hộ tịch tiếp nhận hồ sơ',
-          'Có',
-          'Có',
-          'Có',
-          'Một phần',
-          'Có'
-        ],
-        [
-          4,
-          '1.003412.000.00.00.H42',
-          'Đăng ký khai sinh, đăng ký thường trú, cấp thẻ bảo hiểm y tế cho trẻ em dưới 6 tuổi',
-          'Hộ tịch',
-          'Sở Tư pháp',
-          'Liên thông',
-          'Nghị định 63/2024/NĐ-CP',
-          'https://dichvucong.gov.vn/p/home/dvc-tthc-thu-tuc-hanh-chinh-chi-tiet.html?ma_tthc=1.003412.000.00.00.H42',
-          'Có',
-          'Có',
-          'Có',
-          'Toàn trình',
-          'Có'
-        ],
-        [
-          5,
-          '1.013794',
-          'Thủ tục gia hạn giấy chứng nhận đủ điều kiện hoạt động điểm cung cấp dịch vụ trò chơi điện tử công cộng',
-          'Phát thanh, truyền hình và thông tin điện tử',
-          'Bộ Thông tin và Truyền thông',
-          'Cấp xã, Thành phố',
-          'Quyết định số 256/QĐ-TTPVHCC',
-          'https://dichvucong.gov.vn/p/home/dvc-tthc-thu-tuc-hanh-chinh-chi-tiet.html?ma_tthc=1.013794',
-          'Không',
-          'Có',
-          'Có',
-          'Toàn trình',
-          'Có'
-        ]
-      ];
+      // Dữ liệu dòng: Xuất toàn bộ thủ tục hiện tại trên hệ thống để người dùng có thể chỉnh sửa trực tiếp và nạp lại
+      const rowsData = (existingProcedures && existingProcedures.length > 0)
+        ? existingProcedures.map((p, idx) => {
+            // Xác định nội dung đưa vào mã QR (URL hoặc văn bản tra cứu)
+            let qrPayload = (p.ghiChu && p.ghiChu.trim()) ? p.ghiChu.trim() : '';
+            if (!qrPayload && p.canCuPhapLy && (/https?:\/\/|www\./i.test(p.canCuPhapLy))) {
+              qrPayload = p.canCuPhapLy.trim();
+            }
+            if (!qrPayload && p.maTthc) {
+              qrPayload = `https://dichvucong.gov.vn/p/home/dvc-tthc-thu-tuc-hanh-chinh-chi-tiet.html?ma_tthc=${encodeURIComponent(p.maTthc.trim())}`;
+            }
 
-      sampleData.forEach((rowValues, rIdx) => {
+            // Căn cứ pháp lý / quyết định
+            let canCu = (p.canCuPhapLy && p.canCuPhapLy.trim()) ? p.canCuPhapLy.trim() : '';
+            if (!canCu && p.soQuyetDinh) {
+              canCu = p.ngayBanHanh ? `${p.soQuyetDinh} ngày ${p.ngayBanHanh}` : p.soQuyetDinh;
+            }
+
+            return [
+              idx + 1,
+              p.maTthc || '',
+              p.tenTthc || '',
+              p.linhVuc || '',
+              p.soNganh || '',
+              p.capThucHien || 'Cấp xã',
+              canCu,
+              qrPayload,
+              p.bcciTiepNhan ? 'Có' : 'Không',
+              p.bcciTraKetQua ? 'Có' : 'Không',
+              p.motCua ? 'Có' : 'Không',
+              p.dvcttLoai || 'Không',
+              p.dungChung ? 'Có' : 'Không'
+            ];
+          })
+        : [
+            // Dự phòng khi hệ thống chưa có dữ liệu nào
+            [
+              1,
+              '1.000234.000.00.00.H42',
+              'Thực hiện hỗ trợ khi hòa giải viên gặp tai nạn hoặc rủi ro ảnh hưởng đến sức khỏe, tính mạng trong khi thực hiện hoạt động hòa giải',
+              'Hoà giải cơ sở',
+              'Sở Tư pháp',
+              'Cấp xã',
+              'Quyết định số 421/QĐ-VP.UBND ngày 14/01/2026',
+              'https://dichvucong.gov.vn/p/home/dvc-tthc-thu-tuc-hanh-chinh-chi-tiet.html?ma_tthc=1.000234.000.00.00.H42',
+              'Có',
+              'Có',
+              'Có',
+              'Toàn trình',
+              'Có'
+            ],
+            [
+              2,
+              '1.000235.000.00.00.H42',
+              'Thủ tục công nhận hòa giải viên',
+              'Hoà giải cơ sở',
+              'Sở Tư pháp',
+              'Cấp xã',
+              'Quyết định số 371/QĐ-UBND ngày 05/02/2021',
+              'https://dichvucong.gov.vn/p/home/dvc-tthc-thu-tuc-hanh-chinh-chi-tiet.html?ma_tthc=1.000235.000.00.00.H42',
+              'Không',
+              'Có',
+              'Có',
+              'Một phần',
+              'Không'
+            ]
+          ];
+
+      rowsData.forEach((rowValues) => {
         const row = worksheet.addRow(rowValues);
         row.height = 36;
         for (let c = 1; c <= headers.length; c++) {
@@ -281,12 +270,19 @@ export default function ImportExcelModal({
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `Bieu_mau_nhap_TTHC_Chuan.xlsx`;
+      const count = existingProcedures?.length || 0;
+      link.download = count > 0 
+        ? `Bieu_mau_TTHC_He_thong_${count}_thu_tuc.xlsx` 
+        : `Bieu_mau_nhap_TTHC_Chuan.xlsx`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      onShowToast('Đã tải xuống biểu mẫu Excel chuẩn thành công!', 'success');
+      if (count > 0) {
+        onShowToast(`Đã xuất toàn bộ ${count} thủ tục hiện có trên hệ thống vào file Excel mẫu để bạn chỉnh sửa!`, 'success');
+      } else {
+        onShowToast('Đã tải xuống biểu mẫu Excel chuẩn thành công!', 'success');
+      }
     } catch (err) {
       console.error(err);
       onShowToast('Không thể tạo file mẫu Excel', 'error');
@@ -490,7 +486,9 @@ export default function ImportExcelModal({
                   Biểu mẫu Excel chuẩn
                 </div>
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  Tải tệp mẫu Excel có đầy đủ cấu trúc các cột: Mã TTHC, Tên thủ tục, Bộ/Ngành, Thẩm quyền, Căn cứ pháp lý và Nội dung tạo mã QR.
+                  {existingProcedures && existingProcedures.length > 0
+                    ? `Tải tệp mẫu Excel có đầy đủ cấu trúc các cột và toàn bộ ${existingProcedures.length} TTHC hiện có trên hệ thống để bạn chỉnh sửa trực tiếp và tải lên lại.`
+                    : 'Tải tệp mẫu Excel có đầy đủ cấu trúc các cột: Mã TTHC, Tên thủ tục, Bộ/Ngành, Thẩm quyền, Căn cứ pháp lý và Nội dung tạo mã QR.'}
                 </p>
               </div>
               <button
@@ -499,7 +497,9 @@ export default function ImportExcelModal({
                 className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-white border border-red-200 hover:bg-red-50 text-red-700 rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer"
               >
                 <Download className="w-4 h-4" />
-                Tải file mẫu Excel (.xlsx)
+                {existingProcedures && existingProcedures.length > 0
+                  ? `Tải file mẫu Excel (${existingProcedures.length} TTHC hiện tại)`
+                  : 'Tải file mẫu Excel (.xlsx)'}
               </button>
             </div>
 

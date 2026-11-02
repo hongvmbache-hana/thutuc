@@ -43,15 +43,15 @@ export default function Header({
 
   return (
     <header className="bg-gradient-to-r from-red-800 to-red-950 text-white shadow-md border-b-4 border-amber-500">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between py-4 sm:py-5 gap-4">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between py-3.5 sm:py-4 gap-4">
           
           {/* Logo & Portal Title */}
-          <div className="flex items-center space-x-3.5">
-            <div className="bg-amber-500 text-red-950 text-2.5xl p-2 h-12 w-12 rounded-full shadow-inner flex items-center justify-center animate-pulse select-none shrink-0 border border-amber-300">
+          <div className="flex items-center space-x-3.5 min-w-0">
+            <div className="bg-amber-500 text-red-950 text-2xl p-2 h-11 w-11 rounded-full shadow-inner flex items-center justify-center animate-pulse select-none shrink-0 border border-amber-300">
               {settings.logoEmoji || '🏛️'}
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold uppercase tracking-wider text-amber-350 bg-red-900/90 px-2 py-0.5 rounded border border-red-700/80">
                   {settings.badgeLabel || 'Hệ thống nội bộ'}
@@ -60,17 +60,17 @@ export default function Header({
                   <Database className="w-3 h-3" /> {settings.systemVersion || 'v2.6.4'}
                 </span>
               </div>
-              <h1 className="text-lg sm:text-2xl font-black tracking-tight text-white mt-1 uppercase">
+              <h1 className="text-base sm:text-lg md:text-xl font-black tracking-tight text-white mt-1 uppercase whitespace-nowrap overflow-hidden text-ellipsis">
                 {settings.siteTitle || 'QUẢN LÝ THỦ TỤC HÀNH CHÍNH'}
               </h1>
-              <p className="text-xs text-red-100 font-medium leading-relaxed max-w-2xl">
+              <p className="text-xs text-red-100 font-medium leading-relaxed max-w-2xl truncate sm:whitespace-normal">
                 {settings.siteSubtitle || 'Cổng thông tin điện tử nâng cao chỉ số cải cách hành chính'}
               </p>
             </div>
           </div>
 
           {/* Time, Server Status & Quick Stats Dashboard */}
-          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 md:self-end">
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 md:ml-auto md:self-center shrink-0 justify-end">
             
             {/* Server Sync Status Badge */}
             <div className="bg-red-900/70 backdrop-blur-sm border border-red-700/60 rounded-lg px-3 py-1.5 flex items-center space-x-2 text-xs shadow-inner">
