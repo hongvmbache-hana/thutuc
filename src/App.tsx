@@ -1067,7 +1067,7 @@ export default function App() {
       
       {/* 0. Top Navigation Tab Switcher */}
       <div className="bg-slate-900 text-white border-b border-slate-800 px-4 py-2 select-none shrink-0 print:hidden z-30">
-        <div className="max-w-[1700px] mx-auto flex items-center justify-between gap-3">
+        <div className={`${activeMainTab === 'niemyet' ? 'max-w-[1700px]' : 'max-w-7xl'} mx-auto px-0 sm:px-2 lg:px-4 flex items-center justify-between gap-3`}>
           <div className="flex items-center gap-1.5 sm:gap-2">
             <button
               onClick={() => handleSelectMainTab('niemyet')}

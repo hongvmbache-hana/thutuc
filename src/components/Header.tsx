@@ -43,37 +43,37 @@ export default function Header({
 
   return (
     <header className="bg-gradient-to-r from-red-800 to-red-950 text-white shadow-md border-b-4 border-amber-500">
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between py-3.5 sm:py-4 gap-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between py-3 sm:py-3.5 gap-3 sm:gap-4">
           
           {/* Logo & Portal Title */}
-          <div className="flex items-center space-x-3.5 min-w-0">
-            <div className="bg-amber-500 text-red-950 text-2xl p-2 h-11 w-11 rounded-full shadow-inner flex items-center justify-center animate-pulse select-none shrink-0 border border-amber-300">
+          <div className="flex items-center space-x-3 sm:space-x-3.5 min-w-0 flex-1">
+            <div className="bg-amber-500 text-red-950 text-xl sm:text-2xl p-2 h-10 w-10 sm:h-11 sm:w-11 rounded-full shadow-inner flex items-center justify-center animate-pulse select-none shrink-0 border border-amber-300">
               {settings.logoEmoji || '🏛️'}
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-amber-350 bg-red-900/90 px-2 py-0.5 rounded border border-red-700/80">
+                <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-amber-300 bg-red-900/90 px-2 py-0.5 rounded border border-red-700/80">
                   {settings.badgeLabel || 'Hệ thống nội bộ'}
                 </span>
-                <span className="text-xs text-amber-200 flex items-center gap-1 font-mono font-bold">
+                <span className="text-[11px] sm:text-xs text-amber-200 flex items-center gap-1 font-mono font-bold">
                   <Database className="w-3 h-3" /> {settings.systemVersion || 'v2.6.4'}
                 </span>
               </div>
-              <h1 className="text-base sm:text-lg md:text-xl font-black tracking-tight text-white mt-1 uppercase whitespace-nowrap overflow-hidden text-ellipsis">
+              <h1 className="text-sm sm:text-base lg:text-[17px] font-black tracking-tight text-white mt-0.5 sm:mt-1 uppercase whitespace-nowrap overflow-hidden text-ellipsis" title={settings.siteTitle || 'QUẢN LÝ THỦ TỤC HÀNH CHÍNH'}>
                 {settings.siteTitle || 'QUẢN LÝ THỦ TỤC HÀNH CHÍNH'}
               </h1>
-              <p className="text-xs text-red-100 font-medium leading-relaxed max-w-2xl truncate sm:whitespace-normal">
+              <p className="text-xs text-red-100/90 font-medium leading-relaxed max-w-xl truncate">
                 {settings.siteSubtitle || 'Cổng thông tin điện tử nâng cao chỉ số cải cách hành chính'}
               </p>
             </div>
           </div>
 
           {/* Time, Server Status & Quick Stats Dashboard */}
-          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 md:ml-auto md:self-center shrink-0 justify-end">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 md:ml-4 shrink-0 justify-end">
             
             {/* Server Sync Status Badge */}
-            <div className="bg-red-900/70 backdrop-blur-sm border border-red-700/60 rounded-lg px-3 py-1.5 flex items-center space-x-2 text-xs shadow-inner">
+            <div className="bg-red-900/70 backdrop-blur-sm border border-red-700/60 rounded-lg px-2.5 sm:px-3 py-1.5 flex items-center space-x-2 text-xs shadow-inner">
               <div className="flex items-center gap-1.5">
                 <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${
                   isServerSyncing 
@@ -108,7 +108,7 @@ export default function Header({
             </div>
 
             {/* Clock Widget */}
-            <div className="bg-red-900/60 backdrop-blur-sm border border-red-700/50 rounded-lg px-3.5 py-1.5 flex items-center space-x-3 text-xs shadow-inner">
+            <div className="bg-red-900/60 backdrop-blur-sm border border-red-700/50 rounded-lg px-2.5 sm:px-3 py-1.5 flex items-center space-x-2.5 text-xs shadow-inner">
               <div className="flex flex-col items-end">
                 <span className="text-red-200 font-medium flex items-center gap-1 text-[11px]">
                   <Calendar className="w-3 h-3 text-amber-400" />
@@ -122,8 +122,8 @@ export default function Header({
             </div>
 
             {/* Total Badge Counter */}
-            <div className="bg-amber-500 text-red-950 px-3.5 py-1.5 rounded-lg flex items-center space-x-2 shadow-md border border-amber-400 font-semibold text-xs">
-              <FileText className="w-4 h-4" />
+            <div className="bg-amber-500 text-red-950 px-3 py-1.5 rounded-lg flex items-center space-x-2 shadow-md border border-amber-400 font-semibold text-xs">
+              <FileText className="w-3.5 h-3.5 shrink-0" />
               <div className="flex flex-col leading-none">
                 <span className="text-[9px] uppercase font-bold text-red-900/85">Cơ sở dữ liệu</span>
                 <span className="text-sm font-bold font-mono mt-0.5">{totalCount} TTHC</span>
