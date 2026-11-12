@@ -9,6 +9,7 @@ interface HeaderProps {
   serverStatus?: 'synced' | 'pending' | 'offline';
   onRefreshServer?: () => void;
   lastSyncTime?: string | null;
+  onOpenGoogleSheetConfig?: () => void;
 }
 
 export default function Header({ 
@@ -16,7 +17,8 @@ export default function Header({
   settings, 
   isServerSyncing = false, 
   serverStatus = 'synced', 
-  onRefreshServer 
+  onRefreshServer,
+  onOpenGoogleSheetConfig
 }: HeaderProps) {
   const [time, setTime] = useState(new Date());
 
@@ -82,15 +84,26 @@ export default function Header({
                       ? 'bg-rose-400' 
                       : 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]'
                 }`} />
-                <div className="flex flex-col leading-tight">
-                  <span className="text-[9.5px] uppercase font-bold text-amber-200 tracking-wider flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={onOpenGoogleSheetConfig}
+                  className="flex flex-col leading-tight text-left cursor-pointer group/syncbtn hover:opacity-90"
+                  title="Nhấp để cấu hình hoặc đồng bộ Google Sheets / Excel Online"
+                >
+                  <span className={`text-[9.5px] uppercase font-bold tracking-wider flex items-center gap-1 ${
+                    settings.onlineExcelUrl ? 'text-emerald-300' : 'text-amber-200'
+                  }`}>
                     <Globe className="w-2.5 h-2.5 text-emerald-300" />
-                    Dữ liệu dùng chung
+                    {settings.onlineExcelUrl ? 'Google Sheet Online' : 'Dữ liệu dùng chung'}
                   </span>
-                  <span className="text-[11px] font-semibold text-white/95">
-                    {isServerSyncing ? 'Đang đồng bộ...' : serverStatus === 'offline' ? 'Bộ nhớ cục bộ' : 'Đồng bộ đa thiết bị'}
+                  <span className="text-[11px] font-semibold text-white/95 group-hover/syncbtn:text-amber-300 transition-colors">
+                    {isServerSyncing 
+                      ? 'Đang đồng bộ...' 
+                      : settings.onlineExcelUrl 
+                        ? 'Đồng bộ đa thiết bị' 
+                        : (serverStatus === 'offline' ? 'Bộ nhớ cục bộ' : 'Đồng bộ máy chủ')}
                   </span>
-                </div>
+                </button>
               </div>
 
               {onRefreshServer && (

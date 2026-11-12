@@ -159,3 +159,87 @@ export async function resetServerData(): Promise<ServerSyncResponse> {
     throw err;
   }
 }
+
+/**
+ * Cấu hình đường link Google Sheets / Excel Online trực tiếp và đồng bộ ngay lên máy chủ trung tâm
+ */
+export async function configureOnlineSheet(
+  url: string, 
+  mode: 'replace_all' | 'merge' | 'add_only' | 'replace' = 'replace_all', 
+  autoSync: boolean = true
+): Promise<ServerSyncResponse> {
+  try {
+    const res = await fetch('/api/tthc/configure-online-sheet', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({ url: url.trim(), mode, autoSync })
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || `Lỗi máy chủ (${res.status})`);
+    }
+
+    return data;
+  } catch (err: any) {
+    console.error('Lỗi cấu hình Google Sheets lên máy chủ:', err);
+    throw err;
+  }
+}
+
+/**
+ * Kích hoạt đồng bộ thủ công ngay từ Google Sheet đã lưu trên máy chủ
+ */
+export async function syncOnlineSheet(
+  url?: string, 
+  mode?: 'replace_all' | 'merge' | 'add_only' | 'replace'
+): Promise<ServerSyncResponse> {
+  try {
+    const res = await fetch('/api/tthc/sync-online-sheet', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({ url: url?.trim(), mode })
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || `Lỗi đồng bộ Google Sheets (${res.status})`);
+    }
+
+    return data;
+  } catch (err: any) {
+    console.error('Lỗi đồng bộ Google Sheets:', err);
+    throw err;
+  }
+}
+
+/**
+ * Ngắt kết nối Google Sheet khỏi hệ thống
+ */
+export async function disconnectOnlineSheet(): Promise<ServerSyncResponse> {
+  try {
+    const res = await fetch('/api/tthc/disconnect-online-sheet', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json'
+      }
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || `Lỗi ngắt kết nối (${res.status})`);
+    }
+
+    return data;
+  } catch (err: any) {
+    console.error('Lỗi ngắt kết nối Google Sheet:', err);
+    throw err;
+  }
+}
+

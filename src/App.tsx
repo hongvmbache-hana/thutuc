@@ -10,6 +10,7 @@ import AdminPanel from './components/AdminPanel';
 import ImportExcelModal from './components/ImportExcelModal';
 import BienDongReportModal from './components/BienDongReportModal';
 import OnlineSpreadsheetModal from './components/OnlineSpreadsheetModal';
+import GoogleSheetConfigModal from './components/GoogleSheetConfigModal';
 import AdminLoginModal from './components/AdminLoginModal';
 import NiemYetBoard from './components/NiemYetBoard';
 import { getProcedureTrangThai } from './utils/bienDongHelper';
@@ -63,6 +64,7 @@ export default function App() {
   const [isSyncingOnline, setIsSyncingOnline] = useState(false);
   const [isBienDongModalOpen, setIsBienDongModalOpen] = useState(false);
   const [isOnlineSpreadsheetOpen, setIsOnlineSpreadsheetOpen] = useState(false);
+  const [isGoogleSheetConfigOpen, setIsGoogleSheetConfigOpen] = useState(false);
   const [isServerSyncing, setIsServerSyncing] = useState(false);
   const [serverSyncStatus, setServerSyncStatus] = useState<'synced' | 'pending' | 'offline'>('pending');
   const [serverLastUpdated, setServerLastUpdated] = useState<string | null>(null);
@@ -302,37 +304,8 @@ export default function App() {
       if (serverRes && serverRes.success && serverRes.procedures) {
         const serverProcs = migrateCapThucHien(serverRes.procedures);
 
-        // Kiểm tra nếu máy này có dữ liệu trong LocalStorage đã lưu trước đó
-        const localSaved = localStorage.getItem('tthc_procedures');
-        let localProcs: Procedure[] = [];
-        if (localSaved) {
-          try {
-            localProcs = JSON.parse(localSaved);
-          } catch (e) {}
-        }
-
-        // Trường hợp đặc biệt: Máy Admin này trước đó đã nhập nhiều thủ tục trên trình duyệt,
-        // trong khi máy chủ trung tâm mới khởi tạo chỉ có 11 thủ tục mặc định:
-        // -> Hệ thống tự động đẩy dữ liệu của Admin lên máy chủ dùng chung để các máy khác xem được ngay.
-        if (localProcs.length > serverProcs.length && serverProcs.length <= INITIAL_PROCEDURES.length) {
-          console.log(`[ĐỒNG BỘ MÁY CHỦ] Tự động tải ${localProcs.length} thủ tục từ máy tính này lên máy chủ trung tâm...`);
-          const pushRes = await syncDataToServer({
-            procedures: localProcs,
-            linhVucPresets: serverRes.linhVucPresets || linhVucPresets,
-            soNganhPresets: serverRes.soNganhPresets || soNganhPresets,
-            settings: serverRes.settings || settings,
-            updatedBy: 'Admin (Đồng bộ khởi tạo đa máy)'
-          });
-          setProcedures(localProcs);
-          setServerLastUpdated(pushRes.lastUpdated || new Date().toISOString());
-          setServerSyncStatus('synced');
-          if (showNotification) {
-            showToast(`Đã đồng bộ thành công ${localProcs.length} thủ tục lên máy chủ dùng chung!`, 'success');
-          }
-          return;
-        }
-
-        // Trường hợp thông thường: Cập nhật dữ liệu chuẩn từ máy chủ trung tâm
+        // Luôn sử dụng dữ liệu chính thống từ máy chủ trung tâm (Single Source of Truth)
+        // Tránh lỗi máy khác có cache cũ tự động đè lên dữ liệu mới cập nhật từ Google Sheet/Excel Online
         setProcedures(serverProcs);
         localStorage.setItem('tthc_procedures', JSON.stringify(serverProcs));
 
@@ -1100,6 +1073,30 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-2 text-xs">
+            {/* Direct Google Sheets configuration button */}
+            <button
+              type="button"
+              onClick={() => {
+                if (!checkAdminPermission('Cấu hình liên kết Google Sheets Online', () => setIsGoogleSheetConfigOpen(true))) return;
+                setIsGoogleSheetConfigOpen(true);
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border shadow-xs ${
+                settings.onlineExcelUrl 
+                  ? 'bg-emerald-700 hover:bg-emerald-600 text-white border-emerald-500' 
+                  : 'bg-slate-800 hover:bg-slate-700 text-emerald-300 border-slate-700'
+              }`}
+              title="Cấu hình đường link Google Sheets của bạn để tự động cập nhật số liệu khi nhập trên Sheet"
+              id="top-nav-google-sheets-btn"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-300" />
+              <span>Google Sheet Online</span>
+              {settings.onlineExcelUrl ? (
+                <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse" title="Đang kết nối Google Sheets"></span>
+              ) : (
+                <span className="text-[10px] bg-amber-400 text-slate-950 font-bold px-1 rounded">Dán link</span>
+              )}
+            </button>
+
             {isAdminLoggedIn && (
               <button
                 type="button"
@@ -1111,7 +1108,7 @@ export default function App() {
                 title="Mở biểu mẫu đồng bộ 2 chiều với Google Sheets / Excel Online (Yêu cầu quyền Quản trị viên)"
               >
                 <Globe className="w-3.5 h-3.5 text-emerald-300" />
-                <span>Biểu mẫu Online</span>
+                <span>Biểu mẫu 2 chiều</span>
               </button>
             )}
 
@@ -1207,6 +1204,10 @@ export default function App() {
             serverStatus={serverSyncStatus}
             onRefreshServer={() => loadDataFromServer(true)}
             lastSyncTime={serverLastUpdated}
+            onOpenGoogleSheetConfig={() => {
+              if (!checkAdminPermission('Cấu hình liên kết Google Sheets Online', () => setIsGoogleSheetConfigOpen(true))) return;
+              setIsGoogleSheetConfigOpen(true);
+            }}
           />
 
           {/* 2. Main Dashboard Container */}
@@ -1340,6 +1341,26 @@ export default function App() {
                     <FileSpreadsheet className="w-4 h-4 text-emerald-200" />
                     <span>Biểu Mẫu Online (Sửa 2 chiều)</span>
                     <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse"></span>
+                  </button>
+
+                  {/* Direct Google Sheets Config Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!checkAdminPermission('Cấu hình Google Sheets Online', () => setIsGoogleSheetConfigOpen(true))) return;
+                      setIsGoogleSheetConfigOpen(true);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-95"
+                    id="btn-google-sheet-config-table"
+                    title="Cấu hình dán trực tiếp đường link Google Sheets của bạn để tự động cập nhật số liệu khi nhập trên Sheet"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                    <span>Google Sheet Online</span>
+                    {settings.onlineExcelUrl ? (
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    ) : (
+                      <span className="text-[10px] bg-amber-400 text-slate-950 font-bold px-1 rounded">Dán link</span>
+                    )}
                   </button>
 
                   {/* Import from Excel Button */}
@@ -2126,7 +2147,27 @@ export default function App() {
         />
       )}
 
-      {/* 11. Modal Đăng nhập Quản trị viên */}
+      {/* 11. Modal Cấu hình & Đồng bộ Google Sheets Online */}
+      {isGoogleSheetConfigOpen && (
+        <GoogleSheetConfigModal
+          isOpen={isGoogleSheetConfigOpen}
+          onClose={() => setIsGoogleSheetConfigOpen(false)}
+          settings={settings}
+          procedures={procedures}
+          onSaveSettings={handleSaveSettings}
+          onUpdateProcedures={(updated) => {
+            saveProceduresToStorage(updated);
+          }}
+          onShowToast={showToast}
+          isAdminLoggedIn={isAdminLoggedIn}
+          onRequireAdminLogin={() => {
+            setLoginActionContext('Cấu hình liên kết Google Sheets Online');
+            setIsAdminLoginModalOpen(true);
+          }}
+        />
+      )}
+
+      {/* 12. Modal Đăng nhập Quản trị viên */}
       <AdminLoginModal
         isOpen={isAdminLoginModalOpen}
         onClose={() => {

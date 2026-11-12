@@ -5,6 +5,8 @@ import { createServer as createViteServer } from 'vite';
 import { INITIAL_PROCEDURES, LINH_VUC_PRESETS, SO_NGANH_PRESETS, DEFAULT_APP_SETTINGS } from './src/mockData';
 import { Procedure, AppSettings, UserAccount } from './src/types';
 import { DEFAULT_USERS } from './src/utils/userManagement';
+import { formatOnlineExcelUrl } from './src/utils/onlineExcelSync';
+import { parseWorkbookToProcedures, loadWorkbookFromBuffer } from './src/utils/excelParserHelper';
 
 interface DatabaseSchema {
   procedures: Procedure[];
@@ -76,6 +78,138 @@ function saveDatabase(data: DatabaseSchema): boolean {
     console.error('Lỗi lưu cơ sở dữ liệu:', err);
     return false;
   }
+}
+
+/**
+ * Tải file dữ liệu Google Sheets / Excel Online trực tiếp từ máy chủ Node.js
+ */
+async function fetchOnlineSpreadsheetBuffer(rawUrl: string): Promise<{ buffer: Buffer; isCsv: boolean; sourceUrl: string }> {
+  const urlInfo = formatOnlineExcelUrl(rawUrl);
+  if (!urlInfo.formattedXlsxUrl) {
+    throw new Error('Vui lòng nhập đường dẫn Google Sheets hoặc Excel Online hợp lệ.');
+  }
+
+  const urlsToTry: Array<{ url: string; isCsv: boolean }> = [];
+  urlsToTry.push({ url: urlInfo.formattedXlsxUrl, isCsv: false });
+  if (urlInfo.fallbackCsvUrl) {
+    urlsToTry.push({ url: urlInfo.fallbackCsvUrl, isCsv: true });
+  }
+  if (urlInfo.isGoogleSheet && urlInfo.sheetId) {
+    const gidQuery = urlInfo.gid ? `&gid=${urlInfo.gid}` : '';
+    urlsToTry.push({
+      url: `https://docs.google.com/spreadsheets/d/${urlInfo.sheetId}/export?format=csv${gidQuery}`,
+      isCsv: true
+    });
+  }
+
+  let lastError: any = null;
+  for (const item of urlsToTry) {
+    try {
+      const response = await fetch(item.url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': '*/*'
+        },
+        redirect: 'follow'
+      });
+
+      if (!response.ok) {
+        continue;
+      }
+
+      const contentType = response.headers.get('content-type') || '';
+      const arrayBuffer = await response.arrayBuffer();
+      if (!arrayBuffer || arrayBuffer.byteLength < 50) {
+        continue;
+      }
+
+      const firstBytes = new Uint8Array(arrayBuffer.slice(0, 100));
+      const textSample = String.fromCharCode(...firstBytes).toLowerCase();
+      if (textSample.includes('<!doctype html') || textSample.includes('<html') || textSample.includes('accounts.google.com')) {
+        throw new Error('Tệp Google Sheets chưa được cấp quyền công khai. Vui lòng mở Google Sheets -> Nhấn nút "Chia sẻ" ở góc trên bên phải -> Mục "Quyền truy cập chung" chọn: "Bất kỳ ai có đường liên kết" (Quyền: Người xem).');
+      }
+
+      const isCsv = item.isCsv || contentType.includes('text/csv') || contentType.includes('text/plain');
+      return {
+        buffer: Buffer.from(arrayBuffer),
+        isCsv,
+        sourceUrl: urlInfo.originalUrl
+      };
+    } catch (err: any) {
+      lastError = err;
+      if (err.message && err.message.includes('chưa được cấp quyền công khai')) {
+        throw err;
+      }
+    }
+  }
+
+  throw new Error(lastError?.message || 'Không thể kết nối đến tệp Google Sheets. Vui lòng kiểm tra lại đường link và quyền chia sẻ công khai.');
+}
+
+/**
+ * Phân tích và đồng bộ trực tiếp dữ liệu từ Google Sheets vào cơ sở dữ liệu dùng chung tthc_db.json
+ */
+async function syncDatabaseFromOnlineSheet(
+  rawUrl: string, 
+  mode: 'replace_all' | 'merge' | 'add_only' | 'replace' = 'replace_all'
+) {
+  const { buffer, isCsv } = await fetchOnlineSpreadsheetBuffer(rawUrl);
+  const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+  const workbook = await loadWorkbookFromBuffer(arrayBuffer, isCsv);
+  const parseResult = parseWorkbookToProcedures(workbook);
+
+  if (parseResult.procedures.length === 0) {
+    throw new Error('Không tìm thấy bản ghi thủ tục hành chính nào trong tệp Google Sheets. Vui lòng kiểm tra tiêu đề các cột.');
+  }
+
+  const db = ensureDatabase();
+  let updatedList: Procedure[] = [];
+  if (mode === 'replace' || mode === 'replace_all') {
+    updatedList = parseResult.procedures;
+  } else if (mode === 'add_only') {
+    const existingCodeSet = new Set(db.procedures.map(p => p.maTthc.toLowerCase().trim()));
+    const newItems = parseResult.procedures.filter(p => !existingCodeSet.has(p.maTthc.toLowerCase().trim()));
+    updatedList = [...newItems, ...db.procedures];
+  } else {
+    const map = new Map<string, Procedure>();
+    db.procedures.forEach(p => map.set(p.maTthc.toLowerCase().trim(), p));
+    parseResult.procedures.forEach(p => map.set(p.maTthc.toLowerCase().trim(), p));
+    updatedList = Array.from(map.values());
+  }
+
+  const newLinhVuc = Array.from(new Set([...(db.linhVucPresets || []), ...updatedList.map(p => p.linhVuc).filter(Boolean)]));
+  const newSoNganh = Array.from(new Set([...(db.soNganhPresets || []), ...updatedList.map(p => p.soNganh).filter(Boolean)]));
+
+  const normalizedSyncMode: 'replace_all' | 'merge' | 'add_only' = 
+    mode === 'replace' ? 'replace_all' : mode;
+
+  db.procedures = updatedList;
+  db.linhVucPresets = newLinhVuc;
+  db.soNganhPresets = newSoNganh;
+  db.settings = {
+    ...db.settings,
+    onlineExcelUrl: rawUrl,
+    onlineExcelAutoSync: db.settings.onlineExcelAutoSync ?? true,
+    onlineExcelSyncMode: normalizedSyncMode,
+    lastOnlineSyncDate: new Date().toISOString(),
+    lastOnlineSyncCount: updatedList.length
+  };
+  db.lastUpdated = new Date().toISOString();
+  db.version = (db.version || 1) + 1;
+  saveDatabase(db);
+
+  console.log(`[ĐỒNG BỘ GOOGLE SHEETS] Máy chủ đã nạp và lưu thành công ${updatedList.length} thủ tục từ: ${rawUrl}`);
+
+  return {
+    success: true,
+    count: updatedList.length,
+    procedures: updatedList,
+    linhVucPresets: newLinhVuc,
+    soNganhPresets: newSoNganh,
+    settings: db.settings,
+    lastUpdated: db.lastUpdated,
+    warnings: parseResult.warnings
+  };
 }
 
 async function startServer() {
@@ -463,6 +597,115 @@ async function startServer() {
       res.status(500).json({ error: err?.message || 'Không thể tải file từ đường dẫn trực tuyến' });
     }
   });
+
+  // Cấu hình liên kết Google Sheet / Excel Online trực tiếp và đồng bộ ngay
+  app.post('/api/tthc/configure-online-sheet', async (req, res) => {
+    try {
+      const { url, mode = 'replace', autoSync = true } = req.body || {};
+      if (!url || typeof url !== 'string' || !url.trim()) {
+        return res.status(400).json({ success: false, error: 'Vui lòng cung cấp đường link Google Sheets hoặc Excel Online' });
+      }
+
+      const syncResult = await syncDatabaseFromOnlineSheet(url.trim(), mode);
+      const db = ensureDatabase();
+      db.settings = {
+        ...db.settings,
+        onlineExcelUrl: url.trim(),
+        onlineExcelAutoSync: autoSync,
+        onlineExcelSyncMode: mode
+      };
+      saveDatabase(db);
+
+      res.json({
+        success: true,
+        message: `Đã kết nối và đồng bộ thành công ${syncResult.count} thủ tục từ Google Sheet!`,
+        count: syncResult.count,
+        procedures: syncResult.procedures,
+        settings: db.settings,
+        lastUpdated: syncResult.lastUpdated,
+        warnings: syncResult.warnings
+      });
+    } catch (err: any) {
+      console.error('Lỗi cấu hình Google Sheet:', err);
+      res.status(500).json({ 
+        success: false, 
+        error: err?.message || 'Lỗi kết nối hoặc xử lý dữ liệu từ đường link Google Sheet' 
+      });
+    }
+  });
+
+  // Đồng bộ thủ công ngay từ Google Sheet đã lưu
+  app.post('/api/tthc/sync-online-sheet', async (req, res) => {
+    try {
+      const db = ensureDatabase();
+      const targetUrl = req.body?.url || db.settings?.onlineExcelUrl;
+      const targetMode = req.body?.mode || db.settings?.onlineExcelSyncMode || 'replace';
+
+      if (!targetUrl || typeof targetUrl !== 'string' || !targetUrl.trim()) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Chưa cấu hình đường link Google Sheets trong hệ thống. Vui lòng dán link Google Sheets của bạn trước.' 
+        });
+      }
+
+      const syncResult = await syncDatabaseFromOnlineSheet(targetUrl.trim(), targetMode);
+      res.json({
+        success: true,
+        message: `Đã đồng bộ thành công ${syncResult.count} thủ tục từ Google Sheet!`,
+        count: syncResult.count,
+        procedures: syncResult.procedures,
+        settings: syncResult.settings,
+        lastUpdated: syncResult.lastUpdated,
+        warnings: syncResult.warnings
+      });
+    } catch (err: any) {
+      console.error('Lỗi đồng bộ Google Sheet:', err);
+      res.status(500).json({ 
+        success: false, 
+        error: err?.message || 'Không thể đồng bộ dữ liệu từ Google Sheet' 
+      });
+    }
+  });
+
+  // Hủy liên kết Google Sheet
+  app.post('/api/tthc/disconnect-online-sheet', (req, res) => {
+    try {
+      const db = ensureDatabase();
+      db.settings = {
+        ...db.settings,
+        onlineExcelUrl: '',
+        onlineExcelAutoSync: false
+      };
+      db.lastUpdated = new Date().toISOString();
+      saveDatabase(db);
+
+      res.json({
+        success: true,
+        message: 'Đã hủy liên kết Google Sheets thành công.',
+        settings: db.settings,
+        lastUpdated: db.lastUpdated
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err?.message || 'Lỗi hủy liên kết' });
+    }
+  });
+
+  // Thiết lập vòng lặp chạy nền định kỳ trên máy chủ để tự động cập nhật từ Google Sheet
+  let isBackgroundSyncRunning = false;
+  setInterval(async () => {
+    try {
+      const db = ensureDatabase();
+      if (db.settings?.onlineExcelUrl && db.settings?.onlineExcelAutoSync !== false && !isBackgroundSyncRunning) {
+        isBackgroundSyncRunning = true;
+        await syncDatabaseFromOnlineSheet(db.settings.onlineExcelUrl, db.settings.onlineExcelSyncMode || 'replace_all');
+      }
+    } catch (err: any) {
+      // Bỏ qua lỗi mạng nền tạm thời để không spam log
+    } finally {
+      isBackgroundSyncRunning = false;
+    }
+  }, 45000); // 45 giây kiểm tra 1 lần
+
 
   // Vite middleware for development or static serving in production
   if (process.env.NODE_ENV !== 'production') {

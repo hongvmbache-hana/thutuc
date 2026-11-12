@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { Procedure, AppSettings, OnlineExcelSyncResult } from '../types';
 import { fetchOnlineSpreadsheet, parseSpreadsheetBuffer, formatOnlineExcelUrl } from '../utils/onlineExcelSync';
+import { configureOnlineSheet } from '../services/apiSync';
 import { authenticateUser } from '../utils/userManagement';
 import UserManagementTab from './UserManagementTab';
 import KioskManagementTab from './KioskManagementTab';
@@ -200,19 +201,38 @@ export default function AdminPanel({
   };
 
   // Save specifically online Excel configuration
-  const handleSaveOnlineConfig = () => {
+  const handleSaveOnlineConfig = async () => {
     if (!isAuthorized) {
       onShowToast('Chỉ Quản trị viên mới được phép lưu cấu hình biểu mẫu online!', 'error');
       return;
     }
+    const trimmed = onlineExcelUrl.trim();
     const updated: AppSettings = {
       ...settings,
-      onlineExcelUrl: onlineExcelUrl.trim(),
+      onlineExcelUrl: trimmed,
       onlineExcelAutoSync,
       onlineExcelSyncMode
     };
     onSaveSettings(updated);
-    onShowToast('Đã lưu cấu hình liên kết biểu mẫu Excel Online thành công!', 'success');
+
+    if (trimmed) {
+      try {
+        setIsFetchingOnline(true);
+        const res = await configureOnlineSheet(trimmed, onlineExcelSyncMode, onlineExcelAutoSync);
+        if (res && res.success && res.procedures && onImportSuccess) {
+          onImportSuccess(res.procedures, onlineExcelSyncMode || 'replace');
+          onShowToast(`Đã lưu cấu hình và đồng bộ ngay ${res.procedures.length} thủ tục từ Google Sheet!`, 'success');
+        } else {
+          onShowToast('Đã lưu cấu hình liên kết biểu mẫu Google Sheet Online thành công!', 'success');
+        }
+      } catch (err: any) {
+        onShowToast(`Đã lưu cấu hình liên kết. Lưu ý: ${err.message}`, 'info');
+      } finally {
+        setIsFetchingOnline(false);
+      }
+    } else {
+      onShowToast('Đã lưu cấu hình liên kết biểu mẫu Excel Online thành công!', 'success');
+    }
   };
 
   // Fetch and preview online spreadsheet

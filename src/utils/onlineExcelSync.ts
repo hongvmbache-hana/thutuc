@@ -42,9 +42,9 @@ export function formatOnlineExcelUrl(rawUrl: string): FormattedUrlInfo {
       };
     }
 
-    // Standard Google Sheet ID pattern: /d/{ID}/
-    const idMatch = trimmed.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
-    if (idMatch && idMatch[1]) {
+    // Standard Google Sheet ID pattern: /d/{ID}/ or /u/0/d/{ID}/
+    const idMatch = trimmed.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (idMatch && idMatch[1] && idMatch[1] !== 'e') {
       const sheetId = idMatch[1];
       // Check for gid in fragment or query (#gid=123 or ?gid=123)
       const gidMatch = trimmed.match(/[#&?]gid=([0-9]+)/);
@@ -54,7 +54,7 @@ export function formatOnlineExcelUrl(rawUrl: string): FormattedUrlInfo {
       return {
         originalUrl: trimmed,
         formattedXlsxUrl: `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=xlsx${gidQuery}`,
-        fallbackCsvUrl: `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv${gidQuery}`,
+        fallbackCsvUrl: `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv${gidQuery}`,
         isGoogleSheet: true,
         sheetId,
         gid
