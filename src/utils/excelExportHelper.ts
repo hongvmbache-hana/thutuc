@@ -74,19 +74,29 @@ export const getCleanProcedureTitle = (p: Procedure): string => {
   const canCu = (p.canCuPhapLy || '').trim();
   const isUrl = /https?:\/\/|www\.|dichvucong\.gov\.vn/i.test(canCu) || canCu.includes('://');
   const isQrPayload = Boolean(p.ghiChu && canCu.toLowerCase() === p.ghiChu.toLowerCase().trim());
-  const isDefaultPlaceholder = canCu.toLowerCase() === 'quy định pháp luật hiện hành';
-  const alreadyInTitle = canCu && title.toLowerCase().includes(canCu.toLowerCase());
+  const normalizedCanCuLower = canCu.toLowerCase();
+  const isDefaultPlaceholder =
+    normalizedCanCuLower === 'quy định pháp luật hiện hành' ||
+    normalizedCanCuLower === 'chưa có' ||
+    normalizedCanCuLower === 'không' ||
+    normalizedCanCuLower === '-';
 
-  const isLegalDecision = /^(Quyết định|QĐ|Nghị định|NĐ|Thông tư|TT|Luật|Pháp lệnh|Chỉ thị|Kế hoạch|Văn bản)/i.test(canCu) ||
-    /\b(số\s*\d+[\/\w\.\-]+)/i.test(canCu);
-
-  if (canCu && !isUrl && !isQrPayload && !isDefaultPlaceholder && !alreadyInTitle && isLegalDecision) {
-    const cleanCanCu = canCu
+  if (canCu && !isUrl && !isQrPayload && !isDefaultPlaceholder) {
+    let cleanCanCu = canCu
       .replace(/https?:\/\/[^\s\)]+/gi, '')
+      .replace(/www\.[^\s\)]+/gi, '')
+      .replace(/[\r\n]+/g, ' ')
+      .replace(/\s{2,}/g, ' ')
       .replace(/\(\s*\)/g, '')
       .trim();
-    if (cleanCanCu && cleanCanCu.length > 3) {
-      return `${title} (${cleanCanCu})`;
+
+    while (cleanCanCu.startsWith('(') && cleanCanCu.endsWith(')')) {
+      cleanCanCu = cleanCanCu.slice(1, -1).trim();
+    }
+
+    const alreadyInTitle = cleanCanCu && title.toLowerCase().includes(cleanCanCu.toLowerCase());
+    if (cleanCanCu && !alreadyInTitle) {
+      return `${title}\n(${cleanCanCu})`;
     }
   }
 
@@ -231,8 +241,13 @@ export async function exportProceduresToExcelWithQr(
 
     let currentRowIndex = categoryTitle ? 6 : 5;
     procs.forEach((p, idx) => {
+      const fullTitle = getCleanProcedureTitle(p);
+      const estimatedLines = fullTitle
+        .split('\n')
+        .reduce((acc, part) => acc + Math.max(1, Math.ceil(part.length / 62)), 0);
+
       const row = worksheet.getRow(currentRowIndex);
-      row.height = 95;
+      row.height = Math.max(95, estimatedLines * 18 + 16);
 
       const cellA = worksheet.getCell(`A${currentRowIndex}`);
       cellA.value = idx + 1;
@@ -245,7 +260,7 @@ export async function exportProceduresToExcelWithQr(
       cellB.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
 
       const cellC = worksheet.getCell(`C${currentRowIndex}`);
-      cellC.value = getCleanProcedureTitle(p);
+      cellC.value = fullTitle;
       cellC.font = { name: 'Times New Roman', size: 11 };
       cellC.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
 

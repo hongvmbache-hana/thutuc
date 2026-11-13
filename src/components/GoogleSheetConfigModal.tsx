@@ -32,6 +32,24 @@ interface GoogleSheetConfigModalProps {
   onRequireAdminLogin?: () => void;
 }
 
+const getErrorMessage = (err: unknown, fallback: string): string => {
+  if (!err) return fallback;
+  if (typeof err === 'string') return err === '[object Object]' ? fallback : err;
+  if (err instanceof Error) {
+    return err.message && err.message !== '[object Object]' ? err.message : fallback;
+  }
+  if (typeof err === 'object') {
+    const obj = err as Record<string, unknown>;
+    if (typeof obj.message === 'string' && obj.message.trim() && obj.message !== '[object Object]') {
+      return obj.message;
+    }
+    if (typeof obj.error === 'string' && obj.error.trim() && obj.error !== '[object Object]') {
+      return obj.error;
+    }
+  }
+  return fallback;
+};
+
 export default function GoogleSheetConfigModal({
   isOpen,
   onClose,
@@ -94,8 +112,8 @@ export default function GoogleSheetConfigModal({
       return;
     }
 
-    if (!trimmed.includes('docs.google.com/spreadsheets') && !trimmed.includes('onedrive') && !trimmed.includes('dropbox') && !trimmed.includes('http')) {
-      setErrorMsg('Đường dẫn không hợp lệ. Vui lòng dán liên kết Google Sheets (bắt đầu bằng https://docs.google.com/spreadsheets/...).');
+    if (!/^https?:\/\//i.test(trimmed)) {
+      setErrorMsg('Đường dẫn không hợp lệ. Vui lòng dán liên kết đầy đủ (bắt đầu bằng https://docs.google.com/... hoặc https://drive.google.com/...).');
       return;
     }
 
@@ -122,12 +140,13 @@ export default function GoogleSheetConfigModal({
         setSuccessInfo(`Đã kết nối và đồng bộ thành công ${res.procedures.length} thủ tục hành chính từ Google Sheet! Mọi máy tính khác truy cập vào web sẽ tự động nhận số liệu mới nhất này.`);
         onShowToast(`Đồng bộ thành công ${res.procedures.length} thủ tục từ Google Sheets!`, 'success');
       } else {
-        throw new Error(res.message || 'Lỗi không xác định khi đồng bộ.');
+        throw new Error(getErrorMessage(res, 'Lỗi không xác định khi đồng bộ.'));
       }
-    } catch (err: any) {
-      console.error('Lỗi cấu hình Google Sheet:', err);
-      setErrorMsg(err.message || 'Không thể kết nối đến Google Sheet. Hãy kiểm tra lại quyền truy cập công khai.');
-      onShowToast(err.message || 'Lỗi đồng bộ Google Sheets', 'error');
+    } catch (err: unknown) {
+      console.error('Lỗi cấu hình Google Sheet / Drive:', err);
+      const msg = getErrorMessage(err, 'Không thể kết nối đến Google Sheet / Google Drive. Hãy kiểm tra lại quyền truy cập công khai.');
+      setErrorMsg(msg);
+      onShowToast(msg, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -149,11 +168,12 @@ export default function GoogleSheetConfigModal({
         setSuccessInfo(`Đã cập nhật mới nhất: ${res.procedures.length} thủ tục từ Google Sheet.`);
         onShowToast(`Đã làm mới dữ liệu từ Google Sheet (${res.procedures.length} thủ tục)!`, 'success');
       } else {
-        throw new Error(res.message || 'Lỗi làm mới dữ liệu');
+        throw new Error(getErrorMessage(res, 'Lỗi làm mới dữ liệu'));
       }
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Lỗi làm mới dữ liệu từ Google Sheet');
-      onShowToast(err.message || 'Lỗi làm mới', 'error');
+    } catch (err: unknown) {
+      const msg = getErrorMessage(err, 'Lỗi làm mới dữ liệu từ Google Sheet / Google Drive');
+      setErrorMsg(msg);
+      onShowToast(msg, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -181,8 +201,8 @@ export default function GoogleSheetConfigModal({
       setUrlInput('');
       setSuccessInfo('Đã ngắt kết nối Google Sheet. Hệ thống chuyển về sử dụng dữ liệu lưu trữ nội bộ.');
       onShowToast('Đã ngắt kết nối Google Sheets!', 'info');
-    } catch (err: any) {
-      onShowToast('Lỗi khi ngắt kết nối: ' + err.message, 'error');
+    } catch (err: unknown) {
+      onShowToast('Lỗi khi ngắt kết nối: ' + getErrorMessage(err, 'Không xác định'), 'error');
     } finally {
       setIsLoading(false);
     }
@@ -293,10 +313,10 @@ export default function GoogleSheetConfigModal({
               <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
               <div className="space-y-1">
                 <h4 className="text-xs font-bold text-amber-900 uppercase">
-                  Chưa cấu hình liên kết Google Sheets
+                  Chưa cấu hình liên kết Google Sheets / Google Drive
                 </h4>
                 <p className="text-xs text-amber-800 leading-relaxed">
-                  Dán đường link file Google Sheet của bạn vào ô dưới đây. Sau khi lưu, khi bạn nhập hoặc sửa thủ tục trên Google Sheet, tất cả các máy tính, điện thoại khác khi mở web đều sẽ tự động thấy số liệu mới nhất.
+                  Dán đường link Google Sheet hoặc link file Excel (.xlsx) chia sẻ trên Google Drive của bạn vào ô dưới đây. Sau khi lưu, khi bạn cập nhật số liệu trên file, mọi máy tính và điện thoại khác truy cập web đều sẽ tự động nhận dữ liệu mới nhất.
                 </p>
               </div>
             </div>
@@ -328,7 +348,7 @@ export default function GoogleSheetConfigModal({
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
                 <Link2 className="w-4 h-4 text-emerald-600" />
-                <span>Đường link Google Sheet của bạn:</span>
+                <span>Đường link Google Sheet hoặc file Excel trên Google Drive:</span>
               </label>
               <button
                 type="button"
@@ -345,7 +365,7 @@ export default function GoogleSheetConfigModal({
                 type="url"
                 value={urlInput}
                 onChange={(e) => setUrlInput(e.target.value)}
-                placeholder="https://docs.google.com/spreadsheets/d/1BxiMVs.../edit?usp=sharing"
+                placeholder="https://docs.google.com/spreadsheets/d/... hoặc https://drive.google.com/file/d/.../view?usp=sharing"
                 className="w-full px-4 py-3 bg-slate-50 hover:bg-white focus:bg-white rounded-xl border border-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition-all text-xs sm:text-sm font-mono text-slate-800"
                 id="input-google-sheet-url"
               />
@@ -361,7 +381,7 @@ export default function GoogleSheetConfigModal({
               )}
             </div>
             <p className="text-[11px] text-slate-500">
-              Hỗ trợ link xem Google Sheets thông thường, link chia sẻ, hoặc link công bố web.
+              Hỗ trợ link Google Sheets (/edit, /pubhtml, /d/e/2PACX-...), link file Excel (.xlsx) chia sẻ trên Google Drive (drive.google.com/file/d/...), OneDrive hoặc link tải trực tiếp.
             </p>
           </div>
 
@@ -369,7 +389,7 @@ export default function GoogleSheetConfigModal({
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 sm:p-5 space-y-3">
             <div className="flex items-center gap-2 text-xs font-bold text-slate-800 uppercase">
               <Share2 className="w-4 h-4 text-emerald-600" />
-              <span>Hướng dẫn cấp quyền xem trên Google Sheet (Rất quan trọng):</span>
+              <span>Hướng dẫn cấp quyền xem trên Google Sheet / Google Drive (Rất quan trọng):</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
@@ -377,9 +397,9 @@ export default function GoogleSheetConfigModal({
                 <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[11px] flex items-center justify-center font-mono">
                   1
                 </span>
-                <h5 className="font-bold text-slate-800">Mở file Google Sheet</h5>
+                <h5 className="font-bold text-slate-800">Mở file Sheet hoặc Drive</h5>
                 <p className="text-slate-600 text-[11px] leading-relaxed">
-                  Mở tệp Google Sheet chứa dữ liệu thủ tục hành chính của bạn trên trình duyệt.
+                  Mở Google Sheet hoặc chuột phải vào file Excel (.xlsx) trên Google Drive của bạn.
                 </p>
               </div>
 
@@ -389,7 +409,7 @@ export default function GoogleSheetConfigModal({
                 </span>
                 <h5 className="font-bold text-slate-800">Bấm nút "Chia sẻ" (Share)</h5>
                 <p className="text-slate-600 text-[11px] leading-relaxed">
-                  Bấm nút <strong>"Chia sẻ"</strong> (màu xanh lá hoặc xanh dương) ở góc trên bên phải màn hình.
+                  Bấm nút <strong>"Chia sẻ"</strong> (Share) để mở bảng thiết lập quyền truy cập đường liên kết.
                 </p>
               </div>
 
@@ -399,13 +419,13 @@ export default function GoogleSheetConfigModal({
                 </span>
                 <h5 className="font-bold text-slate-800">Chọn "Bất kỳ ai có liên kết"</h5>
                 <p className="text-slate-600 text-[11px] leading-relaxed">
-                  Tại mục <strong>Quyền truy cập chung</strong>, chọn: <strong>Bất kỳ ai có đường liên kết</strong> (Vai trò: <strong>Người xem</strong>).
+                  Tại mục <strong>Quyền truy cập chung</strong>, chọn: <strong>Bất kỳ ai có đường liên kết</strong> (Vai trò: <strong>Người xem</strong>), rồi sao chép link dán vào đây.
                 </p>
               </div>
             </div>
             
             <p className="text-[11px] text-slate-500 italic">
-              * Lưu ý: Quyền "Người xem" là đủ để hệ thống đọc tự động, bảo đảm không ai bên ngoài có thể tự ý sửa file của bạn nếu bạn không cấp quyền chỉnh sửa.
+              * Lưu ý: Quyền "Người xem" là đủ để hệ thống đọc tự động. Nếu dùng chức năng "Xuất bản lên web" (/d/e/2PACX-...), hãy đảm bảo đã nhấn "Xuất bản" hoặc dùng trực tiếp nút "Chia sẻ" của Google Sheet / Google Drive.
             </p>
           </div>
 

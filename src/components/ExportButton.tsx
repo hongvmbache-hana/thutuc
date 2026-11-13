@@ -97,21 +97,29 @@ export default function ExportButton({ procedures, activeTableName = "Danh sách
     const canCu = (p.canCuPhapLy || '').trim();
     const isUrl = /https?:\/\/|www\.|dichvucong\.gov\.vn/i.test(canCu) || canCu.includes('://');
     const isQrPayload = Boolean(p.ghiChu && canCu.toLowerCase() === p.ghiChu.toLowerCase().trim());
-    const isDefaultPlaceholder = canCu.toLowerCase() === 'quy định pháp luật hiện hành';
-    const alreadyInTitle = canCu && title.toLowerCase().includes(canCu.toLowerCase());
+    const normalizedCanCuLower = canCu.toLowerCase();
+    const isDefaultPlaceholder =
+      normalizedCanCuLower === 'quy định pháp luật hiện hành' ||
+      normalizedCanCuLower === 'chưa có' ||
+      normalizedCanCuLower === 'không' ||
+      normalizedCanCuLower === '-';
 
-    // Chỉ bổ sung nếu là văn bản pháp lý hợp lệ thực sự (Quyết định, Nghị định, Thông tư, Luật...)
-    // và TUYỆT ĐỐI không chứa link hay URL nào
-    const isLegalDecision = /^(Quyết định|QĐ|Nghị định|NĐ|Thông tư|TT|Luật|Pháp lệnh|Chỉ thị|Kế hoạch|Văn bản)/i.test(canCu) ||
-      /\b(số\s*\d+[\/\w\.\-]+)/i.test(canCu);
-
-    if (canCu && !isUrl && !isQrPayload && !isDefaultPlaceholder && !alreadyInTitle && isLegalDecision) {
-      const cleanCanCu = canCu
+    if (canCu && !isUrl && !isQrPayload && !isDefaultPlaceholder) {
+      let cleanCanCu = canCu
         .replace(/https?:\/\/[^\s\)]+/gi, '')
+        .replace(/www\.[^\s\)]+/gi, '')
+        .replace(/[\r\n]+/g, ' ')
+        .replace(/\s{2,}/g, ' ')
         .replace(/\(\s*\)/g, '')
         .trim();
-      if (cleanCanCu && cleanCanCu.length > 3) {
-        return `${title} (${cleanCanCu})`;
+
+      while (cleanCanCu.startsWith('(') && cleanCanCu.endsWith(')')) {
+        cleanCanCu = cleanCanCu.slice(1, -1).trim();
+      }
+
+      const alreadyInTitle = cleanCanCu && title.toLowerCase().includes(cleanCanCu.toLowerCase());
+      if (cleanCanCu && !alreadyInTitle) {
+        return `${title}\n(${cleanCanCu})`;
       }
     }
 
@@ -226,8 +234,13 @@ export default function ExportButton({ procedures, activeTableName = "Danh sách
 
         // Add each procedure row
         procs.forEach((p, idx) => {
+          const fullTitle = getCleanProcedureTitle(p);
+          const estimatedLines = fullTitle
+            .split('\n')
+            .reduce((acc, part) => acc + Math.max(1, Math.ceil(part.length / 62)), 0);
+
           const row = worksheet.getRow(currentRowIndex);
-          row.height = 95; // Ample height for square QR code
+          row.height = Math.max(95, estimatedLines * 18 + 16); // Ample height for square QR code + wrapped legal basis
 
           // Cell A: STT
           const cellA = worksheet.getCell(`A${currentRowIndex}`);
@@ -253,9 +266,9 @@ export default function ExportButton({ procedures, activeTableName = "Danh sách
             right: { style: 'thin', color: { argb: 'FF000000' } }
           };
 
-          // Cell C: Tên TTHC (đã làm sạch, không hiển thị link/URL của mã QR)
+          // Cell C: Tên TTHC (đã làm sạch, kèm căn cứ pháp lý xuống dòng trong ngoặc nếu có)
           const cellC = worksheet.getCell(`C${currentRowIndex}`);
-          cellC.value = getCleanProcedureTitle(p);
+          cellC.value = fullTitle;
           cellC.font = { name: 'Times New Roman', size: 11 };
           cellC.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
           cellC.border = {
@@ -394,12 +407,16 @@ export default function ExportButton({ procedures, activeTableName = "Danh sách
         // Procedure items
         fieldProcs.forEach(p => {
           const qrSrc = qrCodeMap[p.id] || '';
-          const fullTitle = getCleanProcedureTitle(p);
+          const fullTitleHtml = getCleanProcedureTitle(p)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/\n/g, '<br/>');
 
           tableRowsHtml += `
             <tr class="data-row">
               <td class="col-stt">${globalIndex++}</td>
-              <td class="col-name">${fullTitle}</td>
+              <td class="col-name">${fullTitleHtml}</td>
               <td class="col-qrcode">
                 ${qrSrc ? `<img src="${qrSrc}" alt="QR ${p.maTthc}" class="qr-image" />` : ''}
               </td>

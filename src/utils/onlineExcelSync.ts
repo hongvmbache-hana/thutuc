@@ -6,13 +6,15 @@ export interface FormattedUrlInfo {
   originalUrl: string;
   formattedXlsxUrl: string;
   fallbackCsvUrl?: string;
+  extraUrls?: Array<{ url: string; isCsv: boolean }>;
   isGoogleSheet: boolean;
+  isGoogleDrive?: boolean;
   sheetId?: string;
   gid?: string;
 }
 
 /**
- * Normalizes online spreadsheet URLs (Google Sheets, OneDrive, Dropbox, direct link).
+ * Normalizes online spreadsheet URLs (Google Sheets, Google Drive Excel files, OneDrive, Dropbox, direct link).
  */
 export function formatOnlineExcelUrl(rawUrl: string): FormattedUrlInfo {
   const trimmed = rawUrl.trim();
@@ -24,29 +26,31 @@ export function formatOnlineExcelUrl(rawUrl: string): FormattedUrlInfo {
     };
   }
 
-  // 1. Check if Google Sheets
+  // 1a. Google Sheets Published to Web (/d/e/2PACX-...)
+  if (trimmed.includes('docs.google.com/spreadsheets') && trimmed.includes('/d/e/')) {
+    const pubIdMatch = trimmed.match(/(https?:\/\/docs\.google\.com\/spreadsheets(?:\/u\/\d+)?\/d\/e\/[a-zA-Z0-9_-]+)/);
+    const baseUrl = pubIdMatch ? pubIdMatch[1] : trimmed.split('/pub')[0];
+    const gidMatch = trimmed.match(/[?#&]gid=([0-9]+)/);
+    const gid = gidMatch ? gidMatch[1] : undefined;
+    const gidQuery = gid ? `&gid=${gid}` : '';
+
+    return {
+      originalUrl: trimmed,
+      formattedXlsxUrl: `${baseUrl}/pub?output=xlsx${gidQuery}`,
+      fallbackCsvUrl: `${baseUrl}/pub?output=csv${gidQuery}`,
+      extraUrls: [
+        { url: `${baseUrl}/pub?output=csv${gid ? `&gid=${gid}&single=true` : ''}`, isCsv: true }
+      ],
+      isGoogleSheet: true,
+      gid
+    };
+  }
+
+  // 1b. Standard Google Sheets (/d/{ID}/ or /u/0/d/{ID}/)
   if (trimmed.includes('docs.google.com/spreadsheets')) {
-    // Check if published to web (/pubhtml or /pub)
-    if (trimmed.includes('/pubhtml') || trimmed.includes('/pub')) {
-      const baseUrl = trimmed.split('/pub')[0];
-      const gidMatch = trimmed.match(/[?&]gid=([0-9]+)/);
-      const gid = gidMatch ? gidMatch[1] : undefined;
-      const gidQuery = gid ? `&gid=${gid}` : '';
-
-      return {
-        originalUrl: trimmed,
-        formattedXlsxUrl: `${baseUrl}/pub?output=xlsx${gidQuery}`,
-        fallbackCsvUrl: `${baseUrl}/pub?output=csv${gidQuery}`,
-        isGoogleSheet: true,
-        gid
-      };
-    }
-
-    // Standard Google Sheet ID pattern: /d/{ID}/ or /u/0/d/{ID}/
     const idMatch = trimmed.match(/\/d\/([a-zA-Z0-9_-]+)/);
     if (idMatch && idMatch[1] && idMatch[1] !== 'e') {
       const sheetId = idMatch[1];
-      // Check for gid in fragment or query (#gid=123 or ?gid=123)
       const gidMatch = trimmed.match(/[#&?]gid=([0-9]+)/);
       const gid = gidMatch ? gidMatch[1] : undefined;
       const gidQuery = gid ? `&gid=${gid}` : '';
@@ -55,9 +59,35 @@ export function formatOnlineExcelUrl(rawUrl: string): FormattedUrlInfo {
         originalUrl: trimmed,
         formattedXlsxUrl: `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=xlsx${gidQuery}`,
         fallbackCsvUrl: `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv${gidQuery}`,
+        extraUrls: [
+          { url: `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv${gidQuery}`, isCsv: true }
+        ],
         isGoogleSheet: true,
         sheetId,
         gid
+      };
+    }
+  }
+
+  // 1c. Google Drive shared file link (drive.google.com/file/d/{ID}/... or drive.google.com/open?id={ID} or drive.google.com/uc?id={ID})
+  if (trimmed.includes('drive.google.com') || trimmed.includes('drive.usercontent.google.com')) {
+    const fileIdMatch =
+      trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) ||
+      trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if (fileIdMatch && fileIdMatch[1]) {
+      const fileId = fileIdMatch[1];
+      return {
+        originalUrl: trimmed,
+        formattedXlsxUrl: `https://drive.usercontent.google.com/download?id=${fileId}&export=download&confirm=t`,
+        extraUrls: [
+          { url: `https://drive.google.com/uc?export=download&id=${fileId}&confirm=t`, isCsv: false },
+          { url: `https://drive.google.com/uc?export=download&id=${fileId}`, isCsv: false },
+          { url: `https://docs.google.com/spreadsheets/d/${fileId}/export?format=xlsx`, isCsv: false },
+          { url: `https://docs.google.com/spreadsheets/d/${fileId}/gviz/tq?tqx=out:csv`, isCsv: true }
+        ],
+        isGoogleSheet: false,
+        isGoogleDrive: true,
+        sheetId: fileId
       };
     }
   }
@@ -101,31 +131,39 @@ export function formatOnlineExcelUrl(rawUrl: string): FormattedUrlInfo {
 export async function fetchOnlineSpreadsheet(rawUrl: string): Promise<{ buffer: ArrayBuffer; isCsv: boolean; sourceUrl: string }> {
   const urlInfo = formatOnlineExcelUrl(rawUrl);
   if (!urlInfo.formattedXlsxUrl) {
-    throw new Error('Vui lòng nhập đường dẫn biểu mẫu Excel hoặc Google Sheets hợp lệ.');
+    throw new Error('Vui lòng nhập đường dẫn biểu mẫu Excel, Google Drive hoặc Google Sheets hợp lệ.');
+  }
+
+  const candidateTargets: Array<{ url: string; isCsv: boolean }> = [
+    { url: urlInfo.formattedXlsxUrl, isCsv: false }
+  ];
+  if (urlInfo.fallbackCsvUrl) {
+    candidateTargets.push({ url: urlInfo.fallbackCsvUrl, isCsv: true });
+  }
+  if (urlInfo.extraUrls && urlInfo.extraUrls.length > 0) {
+    candidateTargets.push(...urlInfo.extraUrls);
   }
 
   const urlsToTry: Array<{ url: string; isCsv: boolean }> = [];
 
-  // If local Vite proxy is accessible, try it first
-  urlsToTry.push({ url: `/api/fetch-online-excel?url=${encodeURIComponent(urlInfo.formattedXlsxUrl)}`, isCsv: false });
-  if (urlInfo.fallbackCsvUrl) {
-    urlsToTry.push({ url: `/api/fetch-online-excel?url=${encodeURIComponent(urlInfo.fallbackCsvUrl)}`, isCsv: true });
+  // 1. Server proxy first (avoids CORS completely)
+  for (const target of candidateTargets) {
+    urlsToTry.push({ url: `/api/fetch-online-excel?url=${encodeURIComponent(target.url)}`, isCsv: target.isCsv });
   }
 
-  // Direct fetch (works if CORS is allowed)
-  urlsToTry.push({ url: urlInfo.formattedXlsxUrl, isCsv: false });
-  if (urlInfo.fallbackCsvUrl) {
-    urlsToTry.push({ url: urlInfo.fallbackCsvUrl, isCsv: true });
+  // 2. Direct fetch (works if CORS is allowed)
+  for (const target of candidateTargets) {
+    urlsToTry.push({ url: target.url, isCsv: target.isCsv });
   }
 
-  // Public CORS proxies as resilience fallback
+  // 3. Public CORS proxies as resilience fallback
   urlsToTry.push({ url: `https://corsproxy.io/?url=${encodeURIComponent(urlInfo.formattedXlsxUrl)}`, isCsv: false });
   if (urlInfo.fallbackCsvUrl) {
     urlsToTry.push({ url: `https://corsproxy.io/?url=${encodeURIComponent(urlInfo.fallbackCsvUrl)}`, isCsv: true });
   }
-  urlsToTry.push({ url: `https://api.allorigins.win/raw?url=${encodeURIComponent(urlInfo.formattedXlsxUrl)}`, isCsv: false });
 
-  let lastError: any = null;
+  let lastErrorMsg = '';
+  let sawHtmlPage = false;
 
   for (const item of urlsToTry) {
     try {
@@ -139,21 +177,31 @@ export async function fetchOnlineSpreadsheet(rawUrl: string): Promise<{ buffer: 
         continue;
       }
 
-      const contentType = response.headers.get('content-type') || '';
+      const contentType = (response.headers.get('content-type') || '').toLowerCase();
       const arrayBuffer = await response.arrayBuffer();
 
-      if (!arrayBuffer || arrayBuffer.byteLength < 50) {
+      if (!arrayBuffer || arrayBuffer.byteLength < 30) {
         continue;
       }
 
-      // Check if response is HTML error page (e.g. Google Login redirect or 404 page)
-      const firstBytes = new Uint8Array(arrayBuffer.slice(0, 100));
-      const textSample = String.fromCharCode(...firstBytes).toLowerCase();
-      if (textSample.includes('<!doctype html') || textSample.includes('<html') || textSample.includes('accounts.google.com')) {
-        throw new Error('Đường dẫn Google Sheets chưa được chia sẻ công khai ("Bất kỳ ai có liên kết" / "Anyone with the link"). Vui lòng kiểm tra lại quyền truy cập.');
+      const firstBytes = new Uint8Array(arrayBuffer.slice(0, 512));
+      const textSample = new TextDecoder('utf-8', { fatal: false }).decode(firstBytes).toLowerCase();
+      if (
+        contentType.includes('text/html') ||
+        textSample.includes('<!doctype html') ||
+        textSample.includes('<html') ||
+        textSample.includes('accounts.google.com')
+      ) {
+        sawHtmlPage = true;
+        continue;
       }
 
-      const isCsvDetected = item.isCsv || contentType.includes('text/csv') || contentType.includes('text/plain');
+      const isZipXlsx = firstBytes.length >= 2 && firstBytes[0] === 0x50 && firstBytes[1] === 0x4b; // 'PK'
+      const isCsvDetected = !isZipXlsx && (item.isCsv || contentType.includes('text/csv') || contentType.includes('text/plain'));
+
+      if (!isZipXlsx && !isCsvDetected) {
+        continue;
+      }
 
       return {
         buffer: arrayBuffer,
@@ -161,16 +209,21 @@ export async function fetchOnlineSpreadsheet(rawUrl: string): Promise<{ buffer: 
         sourceUrl: urlInfo.originalUrl
       };
     } catch (err: any) {
-      lastError = err;
-      if (err.message && err.message.includes('quyền truy cập')) {
-        throw err;
+      if (typeof err?.message === 'string') {
+        lastErrorMsg = err.message;
       }
     }
   }
 
+  if (sawHtmlPage) {
+    throw new Error(
+      'Tệp Google Sheets / Google Drive chưa được chia sẻ công khai ("Bất kỳ ai có đường liên kết" / "Người xem"). Vui lòng kiểm tra lại quyền chia sẻ của tệp.'
+    );
+  }
+
   throw new Error(
-    lastError?.message || 
-    'Không thể tải dữ liệu từ đường dẫn biểu mẫu online. Hãy đảm bảo rằng tệp Google Sheets đã được cấp quyền "Bất kỳ ai có đường liên kết đều có thể xem" (Anyone with the link can view).'
+    lastErrorMsg ||
+    'Không thể tải dữ liệu từ đường dẫn Google Drive / Google Sheets. Hãy đảm bảo tệp đã bật quyền "Bất kỳ ai có đường liên kết đều có thể xem".'
   );
 }
 

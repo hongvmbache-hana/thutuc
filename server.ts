@@ -86,13 +86,16 @@ function saveDatabase(data: DatabaseSchema): boolean {
 async function fetchOnlineSpreadsheetBuffer(rawUrl: string): Promise<{ buffer: Buffer; isCsv: boolean; sourceUrl: string }> {
   const urlInfo = formatOnlineExcelUrl(rawUrl);
   if (!urlInfo.formattedXlsxUrl) {
-    throw new Error('Vui lòng nhập đường dẫn Google Sheets hoặc Excel Online hợp lệ.');
+    throw new Error('Vui lòng nhập đường dẫn Google Sheets, Google Drive hoặc Excel Online hợp lệ.');
   }
 
   const urlsToTry: Array<{ url: string; isCsv: boolean }> = [];
   urlsToTry.push({ url: urlInfo.formattedXlsxUrl, isCsv: false });
   if (urlInfo.fallbackCsvUrl) {
     urlsToTry.push({ url: urlInfo.fallbackCsvUrl, isCsv: true });
+  }
+  if (urlInfo.extraUrls && urlInfo.extraUrls.length > 0) {
+    urlsToTry.push(...urlInfo.extraUrls);
   }
   if (urlInfo.isGoogleSheet && urlInfo.sheetId) {
     const gidQuery = urlInfo.gid ? `&gid=${urlInfo.gid}` : '';
@@ -102,7 +105,9 @@ async function fetchOnlineSpreadsheetBuffer(rawUrl: string): Promise<{ buffer: B
     });
   }
 
-  let lastError: any = null;
+  let lastErrorMsg = '';
+  let sawHtmlPage = false;
+
   for (const item of urlsToTry) {
     try {
       const response = await fetch(item.url, {
@@ -117,33 +122,50 @@ async function fetchOnlineSpreadsheetBuffer(rawUrl: string): Promise<{ buffer: B
         continue;
       }
 
-      const contentType = response.headers.get('content-type') || '';
+      const contentType = (response.headers.get('content-type') || '').toLowerCase();
       const arrayBuffer = await response.arrayBuffer();
-      if (!arrayBuffer || arrayBuffer.byteLength < 50) {
+      if (!arrayBuffer || arrayBuffer.byteLength < 30) {
         continue;
       }
 
-      const firstBytes = new Uint8Array(arrayBuffer.slice(0, 100));
-      const textSample = String.fromCharCode(...firstBytes).toLowerCase();
-      if (textSample.includes('<!doctype html') || textSample.includes('<html') || textSample.includes('accounts.google.com')) {
-        throw new Error('Tệp Google Sheets chưa được cấp quyền công khai. Vui lòng mở Google Sheets -> Nhấn nút "Chia sẻ" ở góc trên bên phải -> Mục "Quyền truy cập chung" chọn: "Bất kỳ ai có đường liên kết" (Quyền: Người xem).');
+      const buf = Buffer.from(arrayBuffer);
+      const headText = buf.slice(0, 512).toString('utf8').toLowerCase();
+      if (
+        contentType.includes('text/html') ||
+        headText.includes('<!doctype html') ||
+        headText.includes('<html') ||
+        headText.includes('accounts.google.com')
+      ) {
+        sawHtmlPage = true;
+        continue;
       }
 
-      const isCsv = item.isCsv || contentType.includes('text/csv') || contentType.includes('text/plain');
+      const isZipXlsx = buf.length >= 2 && buf[0] === 0x50 && buf[1] === 0x4b; // 'PK' signature for .xlsx
+      const isCsv = !isZipXlsx && (item.isCsv || contentType.includes('text/csv') || contentType.includes('text/plain'));
+
+      if (!isZipXlsx && !isCsv) {
+        continue;
+      }
+
       return {
-        buffer: Buffer.from(arrayBuffer),
+        buffer: buf,
         isCsv,
         sourceUrl: urlInfo.originalUrl
       };
     } catch (err: any) {
-      lastError = err;
-      if (err.message && err.message.includes('chưa được cấp quyền công khai')) {
-        throw err;
+      if (typeof err?.message === 'string' && err.message) {
+        lastErrorMsg = err.message;
       }
     }
   }
 
-  throw new Error(lastError?.message || 'Không thể kết nối đến tệp Google Sheets. Vui lòng kiểm tra lại đường link và quyền chia sẻ công khai.');
+  if (sawHtmlPage) {
+    throw new Error(
+      'Tệp Google Sheets / Google Drive chưa được cấp quyền công khai. Vui lòng mở tệp -> Nhấn "Chia sẻ" -> Mục "Quyền truy cập chung" chọn "Bất kỳ ai có đường liên kết" (Vai trò: Người xem). Nếu dùng Google Sheets, hãy dùng link chia sẻ (docs.google.com/spreadsheets/d/.../edit) hoặc link Công bố lên web dạng CSV/Excel.'
+    );
+  }
+
+  throw new Error(lastErrorMsg || 'Không thể kết nối đến tệp Google Sheets / Google Drive. Vui lòng kiểm tra lại đường link và quyền chia sẻ công khai.');
 }
 
 /**
@@ -598,12 +620,12 @@ async function startServer() {
     }
   });
 
-  // Cấu hình liên kết Google Sheet / Excel Online trực tiếp và đồng bộ ngay
+  // Cấu hình liên kết Google Sheet / Google Drive / Excel Online trực tiếp và đồng bộ ngay
   app.post('/api/tthc/configure-online-sheet', async (req, res) => {
     try {
-      const { url, mode = 'replace', autoSync = true } = req.body || {};
+      const { url, mode = 'replace_all', autoSync = true } = req.body || {};
       if (!url || typeof url !== 'string' || !url.trim()) {
-        return res.status(400).json({ success: false, error: 'Vui lòng cung cấp đường link Google Sheets hoặc Excel Online' });
+        return res.status(400).json({ success: false, error: 'Vui lòng cung cấp đường link Google Sheets, Google Drive hoặc Excel Online' });
       }
 
       const syncResult = await syncDatabaseFromOnlineSheet(url.trim(), mode);
@@ -612,13 +634,13 @@ async function startServer() {
         ...db.settings,
         onlineExcelUrl: url.trim(),
         onlineExcelAutoSync: autoSync,
-        onlineExcelSyncMode: mode
+        onlineExcelSyncMode: syncResult.settings.onlineExcelSyncMode
       };
       saveDatabase(db);
 
       res.json({
         success: true,
-        message: `Đã kết nối và đồng bộ thành công ${syncResult.count} thủ tục từ Google Sheet!`,
+        message: `Đã kết nối và đồng bộ thành công ${syncResult.count} thủ tục từ Google Sheet / Drive!`,
         count: syncResult.count,
         procedures: syncResult.procedures,
         settings: db.settings,
@@ -626,32 +648,37 @@ async function startServer() {
         warnings: syncResult.warnings
       });
     } catch (err: any) {
-      console.error('Lỗi cấu hình Google Sheet:', err);
+      console.error('Lỗi cấu hình Google Sheet / Drive:', err);
+      const errMsg = typeof err === 'string'
+        ? err
+        : (typeof err?.message === 'string' && err.message !== '[object Object]'
+            ? err.message
+            : 'Lỗi kết nối hoặc xử lý dữ liệu từ đường link Google Sheet / Drive');
       res.status(500).json({ 
         success: false, 
-        error: err?.message || 'Lỗi kết nối hoặc xử lý dữ liệu từ đường link Google Sheet' 
+        error: errMsg
       });
     }
   });
 
-  // Đồng bộ thủ công ngay từ Google Sheet đã lưu
+  // Đồng bộ thủ công ngay từ Google Sheet / Drive đã lưu
   app.post('/api/tthc/sync-online-sheet', async (req, res) => {
     try {
       const db = ensureDatabase();
       const targetUrl = req.body?.url || db.settings?.onlineExcelUrl;
-      const targetMode = req.body?.mode || db.settings?.onlineExcelSyncMode || 'replace';
+      const targetMode = req.body?.mode || db.settings?.onlineExcelSyncMode || 'replace_all';
 
       if (!targetUrl || typeof targetUrl !== 'string' || !targetUrl.trim()) {
         return res.status(400).json({ 
           success: false, 
-          error: 'Chưa cấu hình đường link Google Sheets trong hệ thống. Vui lòng dán link Google Sheets của bạn trước.' 
+          error: 'Chưa cấu hình đường link Google Sheets / Drive trong hệ thống. Vui lòng dán link trước.' 
         });
       }
 
       const syncResult = await syncDatabaseFromOnlineSheet(targetUrl.trim(), targetMode);
       res.json({
         success: true,
-        message: `Đã đồng bộ thành công ${syncResult.count} thủ tục từ Google Sheet!`,
+        message: `Đã đồng bộ thành công ${syncResult.count} thủ tục từ Google Sheet / Drive!`,
         count: syncResult.count,
         procedures: syncResult.procedures,
         settings: syncResult.settings,
@@ -659,10 +686,15 @@ async function startServer() {
         warnings: syncResult.warnings
       });
     } catch (err: any) {
-      console.error('Lỗi đồng bộ Google Sheet:', err);
+      console.error('Lỗi đồng bộ Google Sheet / Drive:', err);
+      const errMsg = typeof err === 'string'
+        ? err
+        : (typeof err?.message === 'string' && err.message !== '[object Object]'
+            ? err.message
+            : 'Không thể đồng bộ dữ liệu từ Google Sheet / Drive');
       res.status(500).json({ 
         success: false, 
-        error: err?.message || 'Không thể đồng bộ dữ liệu từ Google Sheet' 
+        error: errMsg
       });
     }
   });

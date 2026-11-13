@@ -160,8 +160,25 @@ export async function resetServerData(): Promise<ServerSyncResponse> {
   }
 }
 
+function extractApiErrorMessage(data: any, fallback: string): string {
+  if (!data) return fallback;
+  if (typeof data.error === 'string' && data.error.trim() && data.error !== '[object Object]') {
+    return data.error;
+  }
+  if (data.error && typeof data.error === 'object') {
+    if (typeof data.error.message === 'string' && data.error.message.trim()) {
+      return data.error.message;
+    }
+    return JSON.stringify(data.error);
+  }
+  if (typeof data.message === 'string' && data.message.trim() && data.message !== '[object Object]') {
+    return data.message;
+  }
+  return fallback;
+}
+
 /**
- * Cấu hình đường link Google Sheets / Excel Online trực tiếp và đồng bộ ngay lên máy chủ trung tâm
+ * Cấu hình đường link Google Sheets / Google Drive / Excel Online trực tiếp và đồng bộ ngay lên máy chủ trung tâm
  */
 export async function configureOnlineSheet(
   url: string, 
@@ -180,18 +197,18 @@ export async function configureOnlineSheet(
 
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(data.error || `Lỗi máy chủ (${res.status})`);
+      throw new Error(extractApiErrorMessage(data, `Lỗi máy chủ (${res.status})`));
     }
 
     return data;
   } catch (err: any) {
-    console.error('Lỗi cấu hình Google Sheets lên máy chủ:', err);
+    console.error('Lỗi cấu hình Google Sheets / Drive lên máy chủ:', err);
     throw err;
   }
 }
 
 /**
- * Kích hoạt đồng bộ thủ công ngay từ Google Sheet đã lưu trên máy chủ
+ * Kích hoạt đồng bộ thủ công ngay từ Google Sheet / Drive đã lưu trên máy chủ
  */
 export async function syncOnlineSheet(
   url?: string, 
@@ -209,12 +226,12 @@ export async function syncOnlineSheet(
 
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(data.error || `Lỗi đồng bộ Google Sheets (${res.status})`);
+      throw new Error(extractApiErrorMessage(data, `Lỗi đồng bộ Google Sheets / Drive (${res.status})`));
     }
 
     return data;
   } catch (err: any) {
-    console.error('Lỗi đồng bộ Google Sheets:', err);
+    console.error('Lỗi đồng bộ Google Sheets / Drive:', err);
     throw err;
   }
 }
@@ -233,7 +250,7 @@ export async function disconnectOnlineSheet(): Promise<ServerSyncResponse> {
 
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(data.error || `Lỗi ngắt kết nối (${res.status})`);
+      throw new Error(extractApiErrorMessage(data, `Lỗi ngắt kết nối (${res.status})`));
     }
 
     return data;
