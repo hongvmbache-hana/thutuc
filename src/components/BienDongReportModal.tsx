@@ -93,7 +93,19 @@ export default function BienDongReportModal({
     statusFilter: statusFilter
   }), [periodType, selectedQuarter, selectedMonth, selectedYear, fromDate, toDate, selectedCap, selectedLinhVuc, statusFilter]);
 
-  // All procedures in this period (without keyword search)
+  // All procedures in this period matching period/cap/linhVuc (regardless of statusFilter) for KPI card counts
+  const basePeriodProcedures = useMemo(() => {
+    return filterProceduresForReport(procedures, {
+      ...filterOptions,
+      statusFilter: 'all'
+    });
+  }, [procedures, filterOptions]);
+
+  const baseStats = useMemo(() => {
+    return computeBienDongStats(basePeriodProcedures);
+  }, [basePeriodProcedures]);
+
+  // All procedures in this period (including statusFilter, without keyword search)
   const periodProcedures = useMemo(() => {
     return filterProceduresForReport(procedures, filterOptions);
   }, [procedures, filterOptions]);
@@ -502,58 +514,126 @@ export default function BienDongReportModal({
 
         </div>
 
-        {/* 4 CORE KPI METRIC CARDS */}
+        {/* 4 CORE KPI METRIC CARDS - Click để lọc & hiển thị danh sách thủ tục tương ứng */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-white border-b border-slate-100 shrink-0">
           
           {/* Card 1: Sửa đổi, bổ sung */}
-          <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl p-3.5 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => {
+              setStatusFilter(prev => prev === 'Sửa đổi, bổ sung' ? 'all' : 'Sửa đổi, bổ sung');
+              setActiveTab('detail');
+            }}
+            title="Nhấn để xem các thủ tục Sửa đổi, Bổ sung"
+            className={`text-left rounded-xl p-3.5 flex items-center justify-between transition-all cursor-pointer border ${
+              statusFilter === 'Sửa đổi, bổ sung'
+                ? 'bg-amber-100/80 border-amber-500 ring-2 ring-amber-400/70 shadow-sm'
+                : 'bg-amber-50/70 border-amber-200/80 hover:bg-amber-100/60 hover:border-amber-400 hover:shadow-xs'
+            }`}
+          >
             <div>
-              <p className="text-[11px] font-bold uppercase text-amber-800 tracking-wider">Sửa đổi, Bổ sung</p>
-              <p className="text-2xl font-black text-amber-900 font-mono mt-0.5">{stats.suaDoi}</p>
+              <p className="text-[11px] font-bold uppercase text-amber-800 tracking-wider flex items-center gap-1.5">
+                <span>Sửa đổi, Bổ sung</span>
+                {statusFilter === 'Sửa đổi, bổ sung' && (
+                  <span className="text-[9px] bg-amber-700 text-white px-1.5 py-0.2 rounded">Đang lọc</span>
+                )}
+              </p>
+              <p className="text-2xl font-black text-amber-900 font-mono mt-0.5">{baseStats.suaDoi}</p>
               <p className="text-[11px] text-amber-700 font-medium">Thủ tục hành chính</p>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-800 flex items-center justify-center font-bold">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-800 flex items-center justify-center font-bold shrink-0">
               SĐBS
             </div>
-          </div>
+          </button>
 
           {/* Card 2: Bãi bỏ */}
-          <div className="bg-rose-50/70 border border-rose-200/80 rounded-xl p-3.5 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => {
+              setStatusFilter(prev => prev === 'Bãi bỏ' ? 'all' : 'Bãi bỏ');
+              setActiveTab('detail');
+            }}
+            title="Nhấn để xem các thủ tục Bãi bỏ / Hủy bỏ"
+            className={`text-left rounded-xl p-3.5 flex items-center justify-between transition-all cursor-pointer border ${
+              statusFilter === 'Bãi bỏ'
+                ? 'bg-rose-100/80 border-rose-500 ring-2 ring-rose-400/70 shadow-sm'
+                : 'bg-rose-50/70 border-rose-200/80 hover:bg-rose-100/60 hover:border-rose-400 hover:shadow-xs'
+            }`}
+          >
             <div>
-              <p className="text-[11px] font-bold uppercase text-rose-800 tracking-wider">Bãi bỏ / Hủy bỏ</p>
-              <p className="text-2xl font-black text-rose-900 font-mono mt-0.5">{stats.baiBo}</p>
+              <p className="text-[11px] font-bold uppercase text-rose-800 tracking-wider flex items-center gap-1.5">
+                <span>Bãi bỏ / Hủy bỏ</span>
+                {statusFilter === 'Bãi bỏ' && (
+                  <span className="text-[9px] bg-rose-700 text-white px-1.5 py-0.2 rounded">Đang lọc</span>
+                )}
+              </p>
+              <p className="text-2xl font-black text-rose-900 font-mono mt-0.5">{baseStats.baiBo}</p>
               <p className="text-[11px] text-rose-700 font-medium">Thủ tục hết hiệu lực</p>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-rose-500/20 text-rose-800 flex items-center justify-center font-bold">
+            <div className="w-10 h-10 rounded-xl bg-rose-500/20 text-rose-800 flex items-center justify-center font-bold shrink-0">
               BÃI
             </div>
-          </div>
+          </button>
 
           {/* Card 3: Ban hành mới */}
-          <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-xl p-3.5 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => {
+              setStatusFilter(prev => prev === 'Ban hành mới' ? 'all' : 'Ban hành mới');
+              setActiveTab('detail');
+            }}
+            title="Nhấn để xem các thủ tục Ban hành mới"
+            className={`text-left rounded-xl p-3.5 flex items-center justify-between transition-all cursor-pointer border ${
+              statusFilter === 'Ban hành mới'
+                ? 'bg-emerald-100/80 border-emerald-500 ring-2 ring-emerald-400/70 shadow-sm'
+                : 'bg-emerald-50/70 border-emerald-200/80 hover:bg-emerald-100/60 hover:border-emerald-400 hover:shadow-xs'
+            }`}
+          >
             <div>
-              <p className="text-[11px] font-bold uppercase text-emerald-800 tracking-wider">Ban hành mới</p>
-              <p className="text-2xl font-black text-emerald-900 font-mono mt-0.5">{stats.banHanhMoi}</p>
+              <p className="text-[11px] font-bold uppercase text-emerald-800 tracking-wider flex items-center gap-1.5">
+                <span>Ban hành mới</span>
+                {statusFilter === 'Ban hành mới' && (
+                  <span className="text-[9px] bg-emerald-700 text-white px-1.5 py-0.2 rounded">Đang lọc</span>
+                )}
+              </p>
+              <p className="text-2xl font-black text-emerald-900 font-mono mt-0.5">{baseStats.banHanhMoi}</p>
               <p className="text-[11px] text-emerald-700 font-medium">Quy trình công bố mới</p>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-800 flex items-center justify-center font-bold">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-800 flex items-center justify-center font-bold shrink-0">
               MỚI
             </div>
-          </div>
+          </button>
 
           {/* Card 4: Tổng số TTHC trong kỳ */}
-          <div className="bg-blue-50/70 border border-blue-200/80 rounded-xl p-3.5 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => {
+              setStatusFilter('all');
+              setActiveTab('detail');
+            }}
+            title="Nhấn để hiển thị toàn bộ TTHC trong kỳ báo cáo"
+            className={`text-left rounded-xl p-3.5 flex items-center justify-between transition-all cursor-pointer border ${
+              statusFilter === 'all'
+                ? 'bg-blue-100/80 border-blue-500 ring-2 ring-blue-400/70 shadow-sm'
+                : 'bg-blue-50/70 border-blue-200/80 hover:bg-blue-100/60 hover:border-blue-400 hover:shadow-xs'
+            }`}
+          >
             <div>
-              <p className="text-[11px] font-bold uppercase text-blue-800 tracking-wider">Tổng TTHC xét duyệt</p>
-              <p className="text-2xl font-black text-blue-900 font-mono mt-0.5">{stats.total}</p>
+              <p className="text-[11px] font-bold uppercase text-blue-800 tracking-wider flex items-center gap-1.5">
+                <span>Tổng TTHC xét duyệt</span>
+                {statusFilter === 'all' && (
+                  <span className="text-[9px] bg-blue-700 text-white px-1.5 py-0.2 rounded">Tất cả</span>
+                )}
+              </p>
+              <p className="text-2xl font-black text-blue-900 font-mono mt-0.5">{baseStats.total}</p>
               <p className="text-[11px] text-blue-700 font-medium">
-                Biến động: <strong className="text-blue-950 font-mono">{stats.tongBienDong}</strong> TTHC
+                Biến động: <strong className="text-blue-950 font-mono">{baseStats.tongBienDong}</strong> TTHC
               </p>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-800 flex items-center justify-center font-bold">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-800 flex items-center justify-center font-bold shrink-0">
               TỔNG
             </div>
-          </div>
+          </button>
 
         </div>
 

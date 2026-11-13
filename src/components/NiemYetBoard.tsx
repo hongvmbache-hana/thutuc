@@ -1888,6 +1888,34 @@ export default function NiemYetBoard({
                 </div>
               </div>
 
+              {(previewDetailProcedure.kiemSoatTrangThai || previewDetailProcedure.kiemSoatGhiChu) && (
+                <div className="p-3 bg-amber-50/70 rounded-xl border border-amber-200 text-xs space-y-1.5">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-amber-900 block">
+                    TRẠNG THÁI KIỂM SOÁT TTHC
+                  </span>
+                  {previewDetailProcedure.kiemSoatTrangThai && (
+                    <div className="flex flex-wrap items-center gap-2 text-slate-800">
+                      <span className="font-bold text-amber-900">{previewDetailProcedure.kiemSoatTrangThai}</span>
+                      {previewDetailProcedure.kiemSoatSoQuyetDinh && (
+                        <span className="font-mono text-[11px] bg-white px-2 py-0.5 rounded border border-amber-200">
+                          Số QĐ: {previewDetailProcedure.kiemSoatSoQuyetDinh}
+                        </span>
+                      )}
+                      {previewDetailProcedure.kiemSoatNgayBanHanh && (
+                        <span className="font-mono text-[11px] text-slate-600">
+                          Ngày: {previewDetailProcedure.kiemSoatNgayBanHanh}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {previewDetailProcedure.kiemSoatGhiChu && (
+                    <p className="text-slate-700 leading-relaxed">
+                      <strong className="text-amber-900">Ghi chú:</strong> {previewDetailProcedure.kiemSoatGhiChu}
+                    </p>
+                  )}
+                </div>
+              )}
+
               {previewDetailProcedure.canCuPhapLy && (
                 <div>
                   <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block mb-1">

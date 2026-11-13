@@ -17,6 +17,10 @@ export interface Procedure {
   trangThai?: 'Sửa đổi, bổ sung' | 'Bãi bỏ' | 'Ban hành mới' | 'Hiện hành'; // Trạng thái biến động TTHC
   ngayBanHanh?: string; // Ngày ban hành / quyết định / hiệu lực (YYYY-MM-DD)
   soQuyetDinh?: string; // Số quyết định công bố
+  kiemSoatTrangThai?: '' | 'Tái thiết kế' | 'TTHC cắt giảm' | 'TTHC thay thế dựa trên CSDL' | 'TTHC cắt giảm, thay thế dựa trên CSDL'; // Trạng thái kiểm soát TTHC
+  kiemSoatSoQuyetDinh?: string; // Số quyết định kiểm soát TTHC
+  kiemSoatNgayBanHanh?: string; // Ngày quyết định / áp dụng kiểm soát TTHC (YYYY-MM-DD)
+  kiemSoatGhiChu?: string; // Ghi chú kiểm soát thủ tục hành chính
 }
 
 export interface SearchFilters {

@@ -38,7 +38,14 @@ export default function ProcedureModal({
     motCua: true,
     canCuPhapLy: '',
     dungChung: true,
-    ghiChu: ''
+    ghiChu: '',
+    trangThai: 'Hiện hành',
+    ngayBanHanh: '',
+    soQuyetDinh: '',
+    kiemSoatTrangThai: '',
+    kiemSoatSoQuyetDinh: '',
+    kiemSoatNgayBanHanh: '',
+    kiemSoatGhiChu: ''
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -86,7 +93,11 @@ export default function ProcedureModal({
         ghiChu: '',
         trangThai: 'Hiện hành',
         ngayBanHanh: '',
-        soQuyetDinh: ''
+        soQuyetDinh: '',
+        kiemSoatTrangThai: '',
+        kiemSoatSoQuyetDinh: '',
+        kiemSoatNgayBanHanh: '',
+        kiemSoatGhiChu: ''
       });
       setCustomLinhVuc(false);
       setCustomSoNganh(false);
@@ -159,6 +170,10 @@ export default function ProcedureModal({
       trangThai: formData.trangThai || 'Hiện hành',
       soQuyetDinh: formData.soQuyetDinh?.trim() || '',
       ngayBanHanh: formData.ngayBanHanh?.trim() || '',
+      kiemSoatTrangThai: formData.kiemSoatTrangThai || '',
+      kiemSoatSoQuyetDinh: formData.kiemSoatSoQuyetDinh?.trim() || '',
+      kiemSoatNgayBanHanh: formData.kiemSoatNgayBanHanh?.trim() || '',
+      kiemSoatGhiChu: formData.kiemSoatGhiChu?.trim() || '',
       ngayTao: procedureToEdit?.ngayTao || new Date().toISOString(),
       ngayCapNhat: new Date().toISOString()
     };
@@ -167,20 +182,19 @@ export default function ProcedureModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div 
-        className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-2xl w-full flex flex-col max-h-[90vh] overflow-hidden animate-scaleIn"
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+      <div
+        className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-6xl w-full flex flex-col max-h-[95vh] overflow-hidden animate-scaleIn"
         id="procedure-modal-container"
       >
-        
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-slate-50 shrink-0">
           <div className="flex items-center gap-2">
             <span className="p-1.5 bg-red-100 text-red-800 rounded-lg">
               <Layers className="w-5 h-5" />
             </span>
             <div>
-              <h2 className="text-lg font-bold text-slate-800" id="modal-title">
+              <h2 className="text-base sm:text-lg font-bold text-slate-800" id="modal-title">
                 {procedureToEdit ? 'CẬP NHẬT THỦ TỤC HÀNH CHÍNH' : 'THÊM THỦ TỤC HÀNH CHÍNH MỚI'}
               </h2>
               {!isAdminLoggedIn && (
@@ -202,7 +216,7 @@ export default function ProcedureModal({
 
         {/* Admin Permission Warning Banner */}
         {!isAdminLoggedIn && (
-          <div className="bg-amber-50 border-b border-amber-200 px-6 py-2.5 flex items-center justify-between gap-3 text-amber-900 text-xs">
+          <div className="bg-amber-50 border-b border-amber-200 px-5 py-2 flex items-center justify-between gap-3 text-amber-900 text-xs shrink-0">
             <div className="flex items-center gap-2">
               <Lock className="w-4 h-4 text-amber-600 shrink-0" />
               <span><strong>Chỉ đọc:</strong> Bạn cần đăng nhập tài khoản Quản trị viên để có quyền Thêm mới hoặc Lưu sửa đổi.</span>
@@ -222,9 +236,10 @@ export default function ProcedureModal({
           </div>
         )}
 
-        {/* Modal Body Form */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4" id="procedure-form">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Modal Body Form - Bố cục 2 cột rộng rãi trên màn hình lớn */}
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-5" id="procedure-form">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+            <div className="lg:col-span-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
             
             {/* Mã TTHC */}
             <div className="space-y-1.5 col-span-1">
@@ -272,7 +287,7 @@ export default function ProcedureModal({
                 Tên thủ tục hành chính <span className="text-red-500">*</span>
               </label>
               <textarea
-                rows={3}
+                rows={2}
                 placeholder="Nhập tên thủ tục hành chính chi tiết..."
                 className={`w-full bg-slate-50 border rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:bg-white text-slate-800 leading-relaxed ${
                   errors.tenTthc ? 'border-red-500 focus:border-red-500' : 'border-slate-200 focus:border-red-600'
@@ -442,55 +457,8 @@ export default function ProcedureModal({
               </div>
             </div>
 
-            {/* Trạng thái biến động & Quyết định/Ngày áp dụng */}
-            <div className="col-span-1 sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-3 bg-amber-50/50 p-3 rounded-lg border border-amber-200">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-amber-900 uppercase tracking-wide block">
-                  Trạng thái TTHC
-                </label>
-                <select
-                  className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-amber-600"
-                  value={formData.trangThai || 'Hiện hành'}
-                  onChange={(e) => setFormData({ ...formData, trangThai: e.target.value as any })}
-                  id="form-trangThai"
-                >
-                  <option value="Hiện hành">Đang hiện hành</option>
-                  <option value="Sửa đổi, bổ sung">Sửa đổi, bổ sung</option>
-                  <option value="Bãi bỏ">Bãi bỏ / Hủy bỏ</option>
-                  <option value="Ban hành mới">Ban hành mới</option>
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wide block">
-                  Số Quyết định
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ví dụ: 752/QĐ-UBND"
-                  className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-medium focus:outline-none focus:border-amber-600 text-slate-800 font-mono"
-                  value={formData.soQuyetDinh || ''}
-                  onChange={(e) => setFormData({ ...formData, soQuyetDinh: e.target.value })}
-                  id="form-soQuyetDinh"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wide block">
-                  Ngày quyết định / áp dụng
-                </label>
-                <input
-                  type="date"
-                  className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-medium focus:outline-none focus:border-amber-600 text-slate-800 font-mono"
-                  value={formData.ngayBanHanh || ''}
-                  onChange={(e) => setFormData({ ...formData, ngayBanHanh: e.target.value })}
-                  id="form-ngayBanHanh"
-                />
-              </div>
-            </div>
-
-            {/* Căn cứ pháp lý */}
-            <div className="col-span-1 sm:col-span-2 space-y-1.5">
+            {/* Căn cứ pháp lý (nằm cuối cột trái) */}
+            <div className="col-span-1 sm:col-span-2 space-y-1">
               <label className="text-xs font-bold text-slate-700 uppercase tracking-wide block">
                 Căn cứ pháp lý <span className="text-red-500">*</span>
               </label>
@@ -507,9 +475,143 @@ export default function ProcedureModal({
               {errors.canCuPhapLy && <p className="text-red-600 text-[10px] font-semibold">{errors.canCuPhapLy}</p>}
             </div>
 
+            </div>
+
+            {/* CỘT PHẢI (6/12): Trạng thái TTHC, Trạng thái kiểm soát TTHC & Mã QR */}
+            <div className="lg:col-span-6 space-y-3">
+            {/* Trạng thái biến động & Trạng thái kiểm soát TTHC */}
+            <div className="bg-amber-50/50 p-3 rounded-lg border border-amber-200 space-y-2.5">
+              {/* Hàng 1: Trạng thái TTHC */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-amber-900 uppercase tracking-wide block">
+                    Trạng thái TTHC
+                  </label>
+                  <select
+                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-amber-600"
+                    value={formData.trangThai || 'Hiện hành'}
+                    onChange={(e) => setFormData({ ...formData, trangThai: e.target.value as any })}
+                    id="form-trangThai"
+                  >
+                    <option value="Hiện hành">Đang hiện hành</option>
+                    <option value="Sửa đổi, bổ sung">Sửa đổi, bổ sung</option>
+                    <option value="Bãi bỏ">Bãi bỏ / Hủy bỏ</option>
+                    <option value="Ban hành mới">Ban hành mới</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wide block">
+                    Số Quyết định
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ví dụ: 752/QĐ-UBND"
+                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-medium focus:outline-none focus:border-amber-600 text-slate-800 font-mono"
+                    value={formData.soQuyetDinh || ''}
+                    onChange={(e) => setFormData({ ...formData, soQuyetDinh: e.target.value })}
+                    id="form-soQuyetDinh"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wide block">
+                    Ngày quyết định / áp dụng
+                  </label>
+                  <input
+                    type="date"
+                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-medium focus:outline-none focus:border-amber-600 text-slate-800 font-mono"
+                    value={formData.ngayBanHanh || ''}
+                    onChange={(e) => setFormData({ ...formData, ngayBanHanh: e.target.value })}
+                    id="form-ngayBanHanh"
+                  />
+                </div>
+              </div>
+
+              {/* Tiêu đề mục Trạng thái kiểm soát TTHC */}
+              <div className="pt-2 border-t border-amber-200/80 text-center">
+                <span className="text-xs font-bold text-amber-900 uppercase tracking-wider">
+                  TRẠNG THÁI KIỂM SOÁT TTHC
+                </span>
+              </div>
+
+              {/* Hàng 2: Trạng thái kiểm soát TTHC */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-amber-900 uppercase tracking-wide block">
+                    Trạng thái TTHC
+                  </label>
+                  <select
+                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-amber-600"
+                    value={formData.kiemSoatTrangThai || ''}
+                    onChange={(e) => setFormData({ ...formData, kiemSoatTrangThai: e.target.value as any })}
+                    id="form-kiemSoatTrangThai"
+                  >
+                    <option value="">-- Chọn trạng thái --</option>
+                    <option value="Tái thiết kế">Tái thiết kế</option>
+                    <option value="TTHC cắt giảm">TTHC cắt giảm</option>
+                    <option value="TTHC thay thế dựa trên CSDL">TTHC thay thế dựa trên CSDL</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wide block">
+                    Số Quyết định
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ví dụ: 752/QĐ-UBND"
+                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-medium focus:outline-none focus:border-amber-600 text-slate-800 font-mono"
+                    value={formData.kiemSoatSoQuyetDinh || ''}
+                    onChange={(e) => setFormData({ ...formData, kiemSoatSoQuyetDinh: e.target.value })}
+                    id="form-kiemSoatSoQuyetDinh"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wide block">
+                    Ngày quyết định / áp dụng
+                  </label>
+                  <input
+                    type="date"
+                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-medium focus:outline-none focus:border-amber-600 text-slate-800 font-mono"
+                    value={formData.kiemSoatNgayBanHanh || ''}
+                    onChange={(e) => setFormData({ ...formData, kiemSoatNgayBanHanh: e.target.value })}
+                    id="form-kiemSoatNgayBanHanh"
+                  />
+                </div>
+              </div>
+
+              {/* Hàng 3: Ghi chú cho trạng thái kiểm soát TTHC */}
+              <div className="space-y-1 pt-0.5">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <label htmlFor="form-kiemSoatGhiChu" className="text-xs font-bold text-amber-900">
+                    Ghi chú:
+                  </label>
+                  {formData.kiemSoatTrangThai && (
+                    <span className="text-[11px] font-semibold text-amber-800 bg-amber-100/80 px-2 py-0.5 rounded border border-amber-200">
+                      Kiểm soát TTHC: {formData.kiemSoatTrangThai}
+                    </span>
+                  )}
+                </div>
+                <textarea
+                  rows={2}
+                  placeholder={
+                    formData.kiemSoatTrangThai
+                      ? `Nhập ghi chú cho thủ tục ở trạng thái "${formData.kiemSoatTrangThai}"...`
+                      : 'Nhập ghi chú cho thủ tục được chọn ở trạng thái kiểm soát thủ tục hành chính...'
+                  }
+                  className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-medium focus:outline-none focus:border-amber-600 text-slate-800 resize-y placeholder:text-slate-400"
+                  value={formData.kiemSoatGhiChu || ''}
+                  onChange={(e) => setFormData({ ...formData, kiemSoatGhiChu: e.target.value })}
+                  id="form-kiemSoatGhiChu"
+                />
+              </div>
+            </div>
+
             {/* Nội dung văn bản cho mã QR Code */}
-            <div className="col-span-1 sm:col-span-2 space-y-1.5 bg-red-50/40 p-3 rounded-lg border border-red-100">
-              <div className="flex items-center justify-between">
+            <div className="space-y-1.5 bg-red-50/40 p-3 rounded-lg border border-red-100">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
                 <label className="text-xs font-bold text-red-900 uppercase tracking-wide flex items-center gap-1.5">
                   <QrCode className="w-4 h-4 text-red-600" />
                   Nội dung văn bản cho mã QR Code
@@ -530,12 +632,13 @@ export default function ProcedureModal({
                 Khi xuất ra Excel hoặc PDF, mã QR code sẽ chứa chính xác nội dung/đường link này để người dân quét và đọc được ngay.
               </p>
             </div>
+            </div>
 
           </div>
         </form>
 
         {/* Modal Footer Controls */}
-        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-2 shrink-0">
+        <div className="px-5 py-3 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-2 shrink-0">
           <div>
             {!isAdminLoggedIn && (
               <span className="text-xs text-red-700 font-bold flex items-center gap-1.5">

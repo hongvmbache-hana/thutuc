@@ -1783,6 +1783,21 @@ export default function App() {
                               <span className="italic">{p.canCuPhapLy}</span>
                             </div>
                           )}
+                          {p.kiemSoatTrangThai && (
+                            <div className="text-[10px] text-indigo-900 mt-1 font-normal flex flex-wrap items-center gap-1.5 bg-indigo-50/80 px-1.5 py-0.5 rounded border border-indigo-200/70">
+                              <span className="font-bold">Kiểm soát TTHC:</span>
+                              <span className="font-semibold">{p.kiemSoatTrangThai}</span>
+                              {p.kiemSoatSoQuyetDinh && (
+                                <span className="font-mono text-indigo-700">({p.kiemSoatSoQuyetDinh})</span>
+                              )}
+                            </div>
+                          )}
+                          {p.kiemSoatGhiChu && (
+                            <div className="text-[10px] text-amber-900 mt-1 font-normal flex items-start gap-1 bg-amber-50/80 px-1.5 py-0.5 rounded border border-amber-200/70 line-clamp-1 group-hover:line-clamp-none">
+                              <span className="font-bold text-amber-900 block whitespace-nowrap shrink-0">Ghi chú kiểm soát:</span>
+                              <span className="text-amber-800">{p.kiemSoatGhiChu}</span>
+                            </div>
+                          )}
                           {p.ghiChu && (
                             <div className="text-[10px] text-emerald-800 mt-1 font-normal flex items-start gap-1 bg-emerald-50/80 px-1.5 py-0.5 rounded border border-emerald-200/60 line-clamp-1 group-hover:line-clamp-none">
                               <span className="font-bold text-emerald-900 block whitespace-nowrap shrink-0">Nội dung QR:</span>
