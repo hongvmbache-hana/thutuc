@@ -29,7 +29,9 @@ import {
   Link2,
   CheckCheck,
   Users,
-  Monitor
+  Monitor,
+  Pencil,
+  Search
 } from 'lucide-react';
 import { Procedure, AppSettings, OnlineExcelSyncResult } from '../types';
 import { fetchOnlineSpreadsheet, parseSpreadsheetBuffer, formatOnlineExcelUrl } from '../utils/onlineExcelSync';
@@ -47,6 +49,10 @@ interface AdminPanelProps {
   setSoNganhPresets: (presets: string[]) => void;
   onSaveLinhVucPresets?: (presets: string[]) => void;
   onSaveSoNganhPresets?: (presets: string[]) => void;
+  onRenameLinhVuc?: (oldName: string, newName: string) => void;
+  onDeleteLinhVuc?: (name: string) => void;
+  onRenameSoNganh?: (oldName: string, newName: string) => void;
+  onDeleteSoNganh?: (name: string) => void;
   onShowToast: (message: string, type: 'success' | 'info' | 'error') => void;
   isAuthorized: boolean;
   setIsAuthorized: (auth: boolean) => void;
@@ -77,6 +83,10 @@ export default function AdminPanel({
   setSoNganhPresets,
   onSaveLinhVucPresets,
   onSaveSoNganhPresets,
+  onRenameLinhVuc,
+  onDeleteLinhVuc,
+  onRenameSoNganh,
+  onDeleteSoNganh,
   onShowToast,
   isAuthorized,
   setIsAuthorized,
@@ -126,9 +136,13 @@ export default function AdminPanel({
   const [onlineError, setOnlineError] = useState<string | null>(null);
   const [previewFilter, setPreviewFilter] = useState('');
 
-  // Add field temporary input states for categories
+  // Add, search & rename temporary input states for categories
   const [newLinhVuc, setNewLinhVuc] = useState('');
   const [newSoNganh, setNewSoNganh] = useState('');
+  const [searchLinhVuc, setSearchLinhVuc] = useState('');
+  const [searchSoNganh, setSearchSoNganh] = useState('');
+  const [editingLinhVuc, setEditingLinhVuc] = useState<{ oldName: string; value: string } | null>(null);
+  const [editingSoNganh, setEditingSoNganh] = useState<{ oldName: string; value: string } | null>(null);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -349,12 +363,47 @@ export default function AdminPanel({
     });
   };
 
+  // Compute unified lists (union of presets and existing procedures) & counts
+  const linhVucCounts = procedures.reduce<Record<string, number>>((acc, p) => {
+    const key = (p.linhVuc || '').trim();
+    if (key) acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+
+  const soNganhCounts = procedures.reduce<Record<string, number>>((acc, p) => {
+    const key = (p.soNganh || '').trim();
+    if (key) acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+
+  const allLinhVucList = Array.from(
+    new Set([
+      ...linhVucPresets.map(x => x.trim()).filter(Boolean),
+      ...procedures.map(p => (p.linhVuc || '').trim()).filter(Boolean)
+    ])
+  );
+
+  const allSoNganhList = Array.from(
+    new Set([
+      ...soNganhPresets.map(x => x.trim()).filter(Boolean),
+      ...procedures.map(p => (p.soNganh || '').trim()).filter(Boolean)
+    ])
+  );
+
+  const filteredLinhVucList = allLinhVucList.filter(item =>
+    !searchLinhVuc.trim() || item.toLowerCase().includes(searchLinhVuc.trim().toLowerCase())
+  );
+
+  const filteredSoNganhList = allSoNganhList.filter(item =>
+    !searchSoNganh.trim() || item.toLowerCase().includes(searchSoNganh.trim().toLowerCase())
+  );
+
   const handleAddLinhVuc = (e: React.FormEvent) => {
     e.preventDefault();
     const val = newLinhVuc.trim();
     if (!val) return;
-    if (linhVucPresets.includes(val)) {
-      onShowToast('Lĩnh vực này đã tồn tại trong cấu hình!', 'error');
+    if (allLinhVucList.some(item => item.toLowerCase() === val.toLowerCase())) {
+      onShowToast('Lĩnh vực này đã tồn tại trong danh mục!', 'error');
       return;
     }
     const updated = [val, ...linhVucPresets];
@@ -368,20 +417,61 @@ export default function AdminPanel({
     onShowToast(`Đã thêm lĩnh vực mới: ${val}`, 'success');
   };
 
+  const handleSaveRenameLinhVuc = () => {
+    if (!editingLinhVuc) return;
+    const oldName = editingLinhVuc.oldName;
+    const newName = editingLinhVuc.value.trim();
+
+    if (!newName) {
+      onShowToast('Tên lĩnh vực không được để trống!', 'error');
+      return;
+    }
+    if (newName === oldName) {
+      setEditingLinhVuc(null);
+      return;
+    }
+    const duplicate = allLinhVucList.some(
+      item => item !== oldName && item.toLowerCase() === newName.toLowerCase()
+    );
+    if (duplicate) {
+      onShowToast(`Lĩnh vực "${newName}" đã tồn tại, vui lòng chọn tên khác!`, 'error');
+      return;
+    }
+
+    if (onRenameLinhVuc) {
+      onRenameLinhVuc(oldName, newName);
+    } else {
+      const updated = Array.from(new Set(allLinhVucList.map(x => (x === oldName ? newName : x))));
+      setLinhVucPresets(updated);
+      localStorage.setItem('tthc_linh_vuc_presets', JSON.stringify(updated));
+    }
+    setEditingLinhVuc(null);
+    onShowToast(`Đã sửa tên lĩnh vực "${oldName}" thành "${newName}"`, 'success');
+  };
+
   const handleDeleteLinhVuc = (item: string) => {
+    const count = linhVucCounts[item] || 0;
+    const warningMsg =
+      count > 0
+        ? `Lĩnh vực "${item}" đang được gắn cho ${count} thủ tục hành chính. Khi xóa, các thủ tục này sẽ được chuyển về "Chưa phân loại". Bạn có chắc chắn muốn xóa không?`
+        : `Bạn có chắc chắn muốn xóa lĩnh vực "${item}" ra khỏi danh mục không?`;
+
     setAdminConfirm({
-      title: 'Xóa lĩnh vực gợi ý',
-      message: `Bạn có chắc chắn muốn xóa lĩnh vực "${item}" ra khỏi danh mục gợi ý không?`,
+      title: 'Xóa danh mục Lĩnh vực',
+      message: warningMsg,
       confirmText: 'Xóa danh mục',
       cancelText: 'Hủy bỏ',
       type: 'danger',
       onConfirm: () => {
-        const updated = linhVucPresets.filter(x => x !== item);
-        if (onSaveLinhVucPresets) {
-          onSaveLinhVucPresets(updated);
+        if (onDeleteLinhVuc) {
+          onDeleteLinhVuc(item);
         } else {
+          const updated = linhVucPresets.filter(x => x !== item);
           setLinhVucPresets(updated);
           localStorage.setItem('tthc_linh_vuc_presets', JSON.stringify(updated));
+        }
+        if (editingLinhVuc?.oldName === item) {
+          setEditingLinhVuc(null);
         }
         onShowToast(`Đã xóa lĩnh vực: ${item}`, 'info');
       }
@@ -392,8 +482,8 @@ export default function AdminPanel({
     e.preventDefault();
     const val = newSoNganh.trim();
     if (!val) return;
-    if (soNganhPresets.includes(val)) {
-      onShowToast('Bộ, ngành/ban này đã có trong cấu hình!', 'error');
+    if (allSoNganhList.some(item => item.toLowerCase() === val.toLowerCase())) {
+      onShowToast('Bộ, ngành quản lý này đã có trong danh mục!', 'error');
       return;
     }
     const updated = [val, ...soNganhPresets];
@@ -404,25 +494,66 @@ export default function AdminPanel({
       localStorage.setItem('tthc_so_nganh_presets', JSON.stringify(updated));
     }
     setNewSoNganh('');
-    onShowToast(`Đã thêm ban/bộ ngành mới: ${val}`, 'success');
+    onShowToast(`Đã thêm Bộ, ngành quản lý mới: ${val}`, 'success');
+  };
+
+  const handleSaveRenameSoNganh = () => {
+    if (!editingSoNganh) return;
+    const oldName = editingSoNganh.oldName;
+    const newName = editingSoNganh.value.trim();
+
+    if (!newName) {
+      onShowToast('Tên Bộ, ngành quản lý không được để trống!', 'error');
+      return;
+    }
+    if (newName === oldName) {
+      setEditingSoNganh(null);
+      return;
+    }
+    const duplicate = allSoNganhList.some(
+      item => item !== oldName && item.toLowerCase() === newName.toLowerCase()
+    );
+    if (duplicate) {
+      onShowToast(`Bộ, ngành "${newName}" đã tồn tại, vui lòng chọn tên khác!`, 'error');
+      return;
+    }
+
+    if (onRenameSoNganh) {
+      onRenameSoNganh(oldName, newName);
+    } else {
+      const updated = Array.from(new Set(allSoNganhList.map(x => (x === oldName ? newName : x))));
+      setSoNganhPresets(updated);
+      localStorage.setItem('tthc_so_nganh_presets', JSON.stringify(updated));
+    }
+    setEditingSoNganh(null);
+    onShowToast(`Đã sửa tên Bộ, ngành "${oldName}" thành "${newName}"`, 'success');
   };
 
   const handleDeleteSoNganh = (item: string) => {
+    const count = soNganhCounts[item] || 0;
+    const warningMsg =
+      count > 0
+        ? `Bộ, ngành quản lý "${item}" đang được gắn cho ${count} thủ tục hành chính. Khi xóa, các thủ tục này sẽ được chuyển về "Chưa phân loại". Bạn có chắc chắn muốn xóa không?`
+        : `Bạn có chắc chắn muốn xóa Bộ, ngành quản lý "${item}" ra khỏi danh mục không?`;
+
     setAdminConfirm({
-      title: 'Xóa ban/bộ ngành gợi ý',
-      message: `Bạn có chắc chắn muốn xóa ban/bộ ngành "${item}" ra khỏi danh mục gợi ý không?`,
+      title: 'Xóa danh mục Bộ, ngành quản lý',
+      message: warningMsg,
       confirmText: 'Xóa danh mục',
       cancelText: 'Hủy bỏ',
       type: 'danger',
       onConfirm: () => {
-        const updated = soNganhPresets.filter(x => x !== item);
-        if (onSaveSoNganhPresets) {
-          onSaveSoNganhPresets(updated);
+        if (onDeleteSoNganh) {
+          onDeleteSoNganh(item);
         } else {
+          const updated = soNganhPresets.filter(x => x !== item);
           setSoNganhPresets(updated);
           localStorage.setItem('tthc_so_nganh_presets', JSON.stringify(updated));
         }
-        onShowToast(`Đã xóa ban/bộ ngành: ${item}`, 'info');
+        if (editingSoNganh?.oldName === item) {
+          setEditingSoNganh(null);
+        }
+        onShowToast(`Đã xóa Bộ, ngành quản lý: ${item}`, 'info');
       }
     });
   };
@@ -540,7 +671,7 @@ export default function AdminPanel({
                   }`}
                 >
                   <Tags className="w-3.5 h-3.5" />
-                  Danh mục cơ sở
+                  Lĩnh vực & Bộ ngành
                 </button>
                 <button
                   type="button"
@@ -800,108 +931,283 @@ export default function AdminPanel({
                     </div>
                   )}
 
-                  {/* TAB 2: EXSITING CATEGORIES MANAGEMENT */}
+                  {/* TAB 2: EXISTING CATEGORIES MANAGEMENT */}
                   {activeTab === 'categories' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fadeIn">
-                      
-                      {/* Left side: Linh Vuc Category list */}
-                      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-4">
-                        <div className="flex items-center gap-2 pb-2 border-b border-slate-100 justify-between">
-                          <div className="flex items-center gap-2">
-                            <Tags className="w-5 h-5 text-indigo-600" />
-                            <h4 className="font-extrabold text-xs uppercase text-slate-800">Cấu hình Lĩnh Vực ({linhVucPresets.length})</h4>
+                    <div className="space-y-4 animate-fadeIn">
+                      <div className="bg-indigo-50/70 border border-indigo-200/80 rounded-xl px-4 py-2.5 text-[11px] text-indigo-900 font-medium flex items-center gap-2">
+                        <Tags className="w-4 h-4 text-indigo-600 shrink-0" />
+                        <span>
+                          Thêm mới, sửa tên hoặc xóa danh mục <strong>Lĩnh vực</strong> và <strong>Bộ, ngành quản lý</strong>. Khi sửa tên, hệ thống tự động cập nhật đồng bộ toàn bộ thủ tục đang sử dụng danh mục đó.
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        {/* Left side: Linh Vuc Category list */}
+                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
+                          <div className="flex items-center gap-2 pb-2 border-b border-slate-100 justify-between">
+                            <div className="flex items-center gap-2">
+                              <Tags className="w-5 h-5 text-indigo-600" />
+                              <h4 className="font-extrabold text-xs uppercase text-slate-800">
+                                Quản lý Lĩnh vực ({allLinhVucList.length})
+                              </h4>
+                            </div>
+                          </div>
+
+                          {/* Register form */}
+                          <form onSubmit={handleAddLinhVuc} className="flex gap-2">
+                            <input
+                              type="text"
+                              required
+                              placeholder="Nhập tên lĩnh vực mới..."
+                              className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold focus:outline-none focus:border-indigo-600 focus:bg-white"
+                              value={newLinhVuc}
+                              onChange={(e) => setNewLinhVuc(e.target.value)}
+                            />
+                            <button
+                              type="submit"
+                              className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-3 py-1.5 text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shrink-0"
+                              title="Thêm Lĩnh Vực mới"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>Thêm</span>
+                            </button>
+                          </form>
+
+                          {/* Search filter */}
+                          <div className="relative">
+                            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                            <input
+                              type="text"
+                              placeholder="Tìm kiếm nhanh lĩnh vực..."
+                              className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-7 py-1.5 text-xs font-medium text-slate-700 focus:outline-none focus:border-indigo-500 focus:bg-white"
+                              value={searchLinhVuc}
+                              onChange={(e) => setSearchLinhVuc(e.target.value)}
+                            />
+                            {searchLinhVuc && (
+                              <button
+                                type="button"
+                                onClick={() => setSearchLinhVuc('')}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                                title="Xóa từ khóa"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Categories scroll area */}
+                          <div className="max-h-72 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100 bg-slate-50/50">
+                            {filteredLinhVucList.map(item => {
+                              const isEditing = editingLinhVuc?.oldName === item;
+                              const count = linhVucCounts[item] || 0;
+                              return (
+                                <div key={item} className="p-2.5 flex items-center justify-between gap-2 group hover:bg-white text-xs transition-colors">
+                                  {isEditing ? (
+                                    <div className="flex-1 flex items-center gap-1.5">
+                                      <input
+                                        type="text"
+                                        autoFocus
+                                        className="flex-1 bg-white border border-indigo-500 rounded-md px-2.5 py-1 text-xs font-semibold text-slate-800 focus:outline-none ring-2 ring-indigo-100"
+                                        value={editingLinhVuc.value}
+                                        onChange={(e) => setEditingLinhVuc({ oldName: item, value: e.target.value })}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            handleSaveRenameLinhVuc();
+                                          } else if (e.key === 'Escape') {
+                                            setEditingLinhVuc(null);
+                                          }
+                                        }}
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={handleSaveRenameLinhVuc}
+                                        className="p-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md cursor-pointer transition-colors"
+                                        title="Lưu tên mới"
+                                      >
+                                        <Check className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingLinhVuc(null)}
+                                        className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-md cursor-pointer transition-colors"
+                                        title="Hủy sửa"
+                                      >
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                                        <span className="font-semibold text-slate-700 truncate" title={item}>{item}</span>
+                                        <span className="shrink-0 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-200/70 text-slate-600">
+                                          {count} TTHC
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-1 shrink-0">
+                                        <button
+                                          type="button"
+                                          onClick={() => setEditingLinhVuc({ oldName: item, value: item })}
+                                          className="text-slate-400 hover:text-indigo-600 p-1 rounded hover:bg-indigo-50 transition-colors cursor-pointer"
+                                          title="Sửa tên lĩnh vực"
+                                        >
+                                          <Pencil className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDeleteLinhVuc(item)}
+                                          className="text-slate-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors cursor-pointer"
+                                          title="Xóa lĩnh vực"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              );
+                            })}
+                            {filteredLinhVucList.length === 0 && (
+                              <p className="text-center text-slate-400 text-[11px] py-6">
+                                {searchLinhVuc.trim() ? 'Không tìm thấy lĩnh vực phù hợp.' : 'Chưa khai báo lĩnh vực nào.'}
+                              </p>
+                            )}
                           </div>
                         </div>
 
-                        {/* Register form */}
-                        <form onSubmit={handleAddLinhVuc} className="flex gap-2">
-                          <input
-                            type="text"
-                            required
-                            placeholder="Nhập tên lĩnh vực mới..."
-                            className="flex-1 bg-slate-50 border border-slate-200 rounded-[8px] px-3 py-1.5 text-xs font-semibold focus:outline-none focus:border-indigo-600 focus:bg-white"
-                            value={newLinhVuc}
-                            onChange={(e) => setNewLinhVuc(e.target.value)}
-                          />
-                          <button
-                            type="submit"
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-[8px] p-2 flex items-center justify-center cursor-pointer transition-colors shrink-0"
-                            title="Thêm Lĩnh Vực mới"
-                          >
-                            <Plus className="w-4 h-4" />
-                          </button>
-                        </form>
+                        {/* Right side: Departments database category list */}
+                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
+                          <div className="flex items-center gap-2 pb-2 border-b border-slate-100 justify-between">
+                            <div className="flex items-center gap-2">
+                              <Landmark className="w-5 h-5 text-emerald-600" />
+                              <h4 className="font-extrabold text-xs uppercase text-slate-800">
+                                Quản lý Bộ, ngành quản lý ({allSoNganhList.length})
+                              </h4>
+                            </div>
+                          </div>
 
-                        {/* Categories scroll area */}
-                        <div className="max-h-60 overflow-y-auto border border-slate-150 rounded-lg divide-y divide-slate-100 bg-slate-50/50">
-                          {linhVucPresets.map(item => (
-                            <div key={item} className="p-2.5 flex items-center justify-between group hover:bg-white text-xs transition-colors">
-                              <span className="font-semibold text-slate-700">{item}</span>
+                          {/* Register form */}
+                          <form onSubmit={handleAddSoNganh} className="flex gap-2">
+                            <input
+                              type="text"
+                              required
+                              placeholder="Nhập tên Bộ, ngành quản lý mới..."
+                              className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold focus:outline-none focus:border-emerald-600 focus:bg-white"
+                              value={newSoNganh}
+                              onChange={(e) => setNewSoNganh(e.target.value)}
+                            />
+                            <button
+                              type="submit"
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-3 py-1.5 text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shrink-0"
+                              title="Thêm Bộ, ngành quản lý mới"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>Thêm</span>
+                            </button>
+                          </form>
+
+                          {/* Search filter */}
+                          <div className="relative">
+                            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                            <input
+                              type="text"
+                              placeholder="Tìm kiếm nhanh Bộ, ngành..."
+                              className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-7 py-1.5 text-xs font-medium text-slate-700 focus:outline-none focus:border-emerald-500 focus:bg-white"
+                              value={searchSoNganh}
+                              onChange={(e) => setSearchSoNganh(e.target.value)}
+                            />
+                            {searchSoNganh && (
                               <button
                                 type="button"
-                                onClick={() => handleDeleteLinhVuc(item)}
-                                className="text-slate-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors cursor-pointer"
-                                title="Xóa lĩnh vực"
+                                onClick={() => setSearchSoNganh('')}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                                title="Xóa từ khóa"
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
+                                <X className="w-3.5 h-3.5" />
                               </button>
-                            </div>
-                          ))}
-                          {linhVucPresets.length === 0 && (
-                            <p className="text-center text-slate-400 text-[11px] py-6">Chưa khai báo lĩnh vực nào.</p>
-                          )}
-                        </div>
-                      </div>
+                            )}
+                          </div>
 
-                      {/* Right side: Departments database category list */}
-                      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-4">
-                        <div className="flex items-center gap-2 pb-2 border-b border-slate-100 justify-between">
-                          <div className="flex items-center gap-2">
-                            <Landmark className="w-5 h-5 text-emerald-600" />
-                            <h4 className="font-extrabold text-xs uppercase text-slate-800">Cấu hình Ban Bộ Ngành ({soNganhPresets.length})</h4>
+                          {/* Departments scroll area */}
+                          <div className="max-h-72 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100 bg-slate-50/50">
+                            {filteredSoNganhList.map(item => {
+                              const isEditing = editingSoNganh?.oldName === item;
+                              const count = soNganhCounts[item] || 0;
+                              return (
+                                <div key={item} className="p-2.5 flex items-center justify-between gap-2 group hover:bg-white text-xs transition-colors">
+                                  {isEditing ? (
+                                    <div className="flex-1 flex items-center gap-1.5">
+                                      <input
+                                        type="text"
+                                        autoFocus
+                                        className="flex-1 bg-white border border-emerald-500 rounded-md px-2.5 py-1 text-xs font-semibold text-slate-800 focus:outline-none ring-2 ring-emerald-100"
+                                        value={editingSoNganh.value}
+                                        onChange={(e) => setEditingSoNganh({ oldName: item, value: e.target.value })}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            handleSaveRenameSoNganh();
+                                          } else if (e.key === 'Escape') {
+                                            setEditingSoNganh(null);
+                                          }
+                                        }}
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={handleSaveRenameSoNganh}
+                                        className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md cursor-pointer transition-colors"
+                                        title="Lưu tên mới"
+                                      >
+                                        <Check className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingSoNganh(null)}
+                                        className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-md cursor-pointer transition-colors"
+                                        title="Hủy sửa"
+                                      >
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                                        <span className="font-semibold text-slate-700 truncate" title={item}>{item}</span>
+                                        <span className="shrink-0 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-200/70 text-slate-600">
+                                          {count} TTHC
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-1 shrink-0">
+                                        <button
+                                          type="button"
+                                          onClick={() => setEditingSoNganh({ oldName: item, value: item })}
+                                          className="text-slate-400 hover:text-emerald-600 p-1 rounded hover:bg-emerald-50 transition-colors cursor-pointer"
+                                          title="Sửa tên Bộ, ngành"
+                                        >
+                                          <Pencil className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDeleteSoNganh(item)}
+                                          className="text-slate-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors cursor-pointer"
+                                          title="Xóa Bộ, ngành"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              );
+                            })}
+                            {filteredSoNganhList.length === 0 && (
+                              <p className="text-center text-slate-400 text-[11px] py-6">
+                                {searchSoNganh.trim() ? 'Không tìm thấy Bộ, ngành phù hợp.' : 'Chưa khai báo Bộ, ngành quản lý nào.'}
+                              </p>
+                            )}
                           </div>
                         </div>
-
-                        {/* Register form */}
-                        <form onSubmit={handleAddSoNganh} className="flex gap-2">
-                          <input
-                            type="text"
-                            required
-                            placeholder="Nhập ban/bộ ngành mới..."
-                            className="flex-1 bg-slate-50 border border-slate-200 rounded-[8px] px-3 py-1.5 text-xs font-semibold focus:outline-none focus:border-emerald-600 focus:bg-white"
-                            value={newSoNganh}
-                            onChange={(e) => setNewSoNganh(e.target.value)}
-                          />
-                          <button
-                            type="submit"
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-[8px] p-2 flex items-center justify-center cursor-pointer transition-colors shrink-0"
-                            title="Thêm ban bộ ngành"
-                          >
-                            <Plus className="w-4 h-4" />
-                          </button>
-                        </form>
-
-                        {/* Departments scroll area */}
-                        <div className="max-h-60 overflow-y-auto border border-slate-150 rounded-lg divide-y divide-slate-100 bg-slate-50/50">
-                          {soNganhPresets.map(item => (
-                            <div key={item} className="p-2.5 flex items-center justify-between group hover:bg-white text-xs transition-colors">
-                              <span className="font-semibold text-slate-700">{item}</span>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteSoNganh(item)}
-                                className="text-slate-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors cursor-pointer"
-                                title="Xóa ban bộ ngành"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          ))}
-                          {soNganhPresets.length === 0 && (
-                            <p className="text-center text-slate-400 text-[11px] py-6">Chưa khai báo ban bộ ngành nào.</p>
-                          )}
-                        </div>
                       </div>
-
                     </div>
                   )}
 

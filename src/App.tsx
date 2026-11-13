@@ -225,6 +225,116 @@ export default function App() {
     }).catch(err => console.warn('Lỗi đồng bộ ban ngành:', err));
   };
 
+  const handleRenameLinhVuc = (oldName: string, newName: string) => {
+    const cleanNew = newName.trim();
+    if (!cleanNew || cleanNew === oldName) return;
+
+    const baseList = Array.from(new Set([...linhVucPresets, ...procedures.map(p => p.linhVuc).filter(Boolean)]));
+    const replaced = baseList.map(item => (item === oldName ? cleanNew : item));
+    const updatedPresets = Array.from(new Set(replaced));
+    if (!updatedPresets.includes(cleanNew)) updatedPresets.unshift(cleanNew);
+
+    const nowIso = new Date().toISOString();
+    const updatedProcedures = procedures.map(p =>
+      p.linhVuc === oldName ? { ...p, linhVuc: cleanNew, ngayCapNhat: nowIso } : p
+    );
+
+    setLinhVucPresets(updatedPresets);
+    localStorage.setItem('tthc_linh_vuc_presets', JSON.stringify(updatedPresets));
+    setProcedures(updatedProcedures);
+    localStorage.setItem('tthc_procedures', JSON.stringify(updatedProcedures));
+    if (filters.linhVuc === oldName) {
+      setFilters(prev => ({ ...prev, linhVuc: cleanNew }));
+    }
+
+    syncDataToServer({
+      procedures: updatedProcedures,
+      linhVucPresets: updatedPresets,
+      soNganhPresets,
+      settings,
+      updatedBy: localStorage.getItem('tthc_admin_username') || 'Admin'
+    }).catch(err => console.warn('Lỗi đồng bộ đổi tên lĩnh vực:', err));
+  };
+
+  const handleDeleteLinhVuc = (name: string) => {
+    const updatedPresets = linhVucPresets.filter(item => item !== name);
+    const nowIso = new Date().toISOString();
+    const updatedProcedures = procedures.map(p =>
+      p.linhVuc === name ? { ...p, linhVuc: 'Chưa phân loại', ngayCapNhat: nowIso } : p
+    );
+
+    setLinhVucPresets(updatedPresets);
+    localStorage.setItem('tthc_linh_vuc_presets', JSON.stringify(updatedPresets));
+    setProcedures(updatedProcedures);
+    localStorage.setItem('tthc_procedures', JSON.stringify(updatedProcedures));
+    if (filters.linhVuc === name) {
+      setFilters(prev => ({ ...prev, linhVuc: 'all' }));
+    }
+
+    syncDataToServer({
+      procedures: updatedProcedures,
+      linhVucPresets: updatedPresets,
+      soNganhPresets,
+      settings,
+      updatedBy: localStorage.getItem('tthc_admin_username') || 'Admin'
+    }).catch(err => console.warn('Lỗi đồng bộ xóa lĩnh vực:', err));
+  };
+
+  const handleRenameSoNganh = (oldName: string, newName: string) => {
+    const cleanNew = newName.trim();
+    if (!cleanNew || cleanNew === oldName) return;
+
+    const baseList = Array.from(new Set([...soNganhPresets, ...procedures.map(p => p.soNganh).filter(Boolean)]));
+    const replaced = baseList.map(item => (item === oldName ? cleanNew : item));
+    const updatedPresets = Array.from(new Set(replaced));
+    if (!updatedPresets.includes(cleanNew)) updatedPresets.unshift(cleanNew);
+
+    const nowIso = new Date().toISOString();
+    const updatedProcedures = procedures.map(p =>
+      p.soNganh === oldName ? { ...p, soNganh: cleanNew, ngayCapNhat: nowIso } : p
+    );
+
+    setSoNganhPresets(updatedPresets);
+    localStorage.setItem('tthc_so_nganh_presets', JSON.stringify(updatedPresets));
+    setProcedures(updatedProcedures);
+    localStorage.setItem('tthc_procedures', JSON.stringify(updatedProcedures));
+    if (filters.soNganh === oldName) {
+      setFilters(prev => ({ ...prev, soNganh: cleanNew }));
+    }
+
+    syncDataToServer({
+      procedures: updatedProcedures,
+      linhVucPresets,
+      soNganhPresets: updatedPresets,
+      settings,
+      updatedBy: localStorage.getItem('tthc_admin_username') || 'Admin'
+    }).catch(err => console.warn('Lỗi đồng bộ đổi tên bộ ngành:', err));
+  };
+
+  const handleDeleteSoNganh = (name: string) => {
+    const updatedPresets = soNganhPresets.filter(item => item !== name);
+    const nowIso = new Date().toISOString();
+    const updatedProcedures = procedures.map(p =>
+      p.soNganh === name ? { ...p, soNganh: 'Chưa phân loại', ngayCapNhat: nowIso } : p
+    );
+
+    setSoNganhPresets(updatedPresets);
+    localStorage.setItem('tthc_so_nganh_presets', JSON.stringify(updatedPresets));
+    setProcedures(updatedProcedures);
+    localStorage.setItem('tthc_procedures', JSON.stringify(updatedProcedures));
+    if (filters.soNganh === name) {
+      setFilters(prev => ({ ...prev, soNganh: 'all' }));
+    }
+
+    syncDataToServer({
+      procedures: updatedProcedures,
+      linhVucPresets,
+      soNganhPresets: updatedPresets,
+      settings,
+      updatedBy: localStorage.getItem('tthc_admin_username') || 'Admin'
+    }).catch(err => console.warn('Lỗi đồng bộ xóa bộ ngành:', err));
+  };
+
   // Load Admin presets from LocalStorage or seed defaults
   const [linhVucPresets, setLinhVucPresets] = useState<string[]>(() => {
     const saved = localStorage.getItem('tthc_linh_vuc_presets');
@@ -1473,6 +1583,10 @@ export default function App() {
                 setSoNganhPresets={setSoNganhPresets}
                 onSaveLinhVucPresets={handleSaveLinhVucPresets}
                 onSaveSoNganhPresets={handleSaveSoNganhPresets}
+                onRenameLinhVuc={handleRenameLinhVuc}
+                onDeleteLinhVuc={handleDeleteLinhVuc}
+                onRenameSoNganh={handleRenameSoNganh}
+                onDeleteSoNganh={handleDeleteSoNganh}
                 onShowToast={showToast}
                 isAuthorized={isAdminLoggedIn}
                 setIsAuthorized={handleAdminLoggedInChange}

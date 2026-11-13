@@ -285,8 +285,8 @@ async function startServer() {
       const currentDb = ensureDatabase();
       const updatedDb: DatabaseSchema = {
         procedures,
-        linhVucPresets: Array.isArray(linhVucPresets) && linhVucPresets.length > 0 ? linhVucPresets : currentDb.linhVucPresets,
-        soNganhPresets: Array.isArray(soNganhPresets) && soNganhPresets.length > 0 ? soNganhPresets : currentDb.soNganhPresets,
+        linhVucPresets: Array.isArray(linhVucPresets) ? linhVucPresets : currentDb.linhVucPresets,
+        soNganhPresets: Array.isArray(soNganhPresets) ? soNganhPresets : currentDb.soNganhPresets,
         settings: settings ? { ...currentDb.settings, ...settings, isCustomized: true } : currentDb.settings,
         users: Array.isArray(users) && users.length > 0 ? users : (currentDb.users || DEFAULT_USERS),
         lastUpdated: new Date().toISOString(),
