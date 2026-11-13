@@ -55,16 +55,43 @@ export function getProcedureTrangThai(p: Procedure): TrangThaiBienDong {
   return 'Hiện hành';
 }
 
+function parseFlexibleDate(value?: string): Date | null {
+  if (!value || typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const isoDateOnly = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (isoDateOnly) {
+    const d = new Date(
+      parseInt(isoDateOnly[1], 10),
+      parseInt(isoDateOnly[2], 10) - 1,
+      parseInt(isoDateOnly[3], 10)
+    );
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  const vnDateOnly = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (vnDateOnly) {
+    const d = new Date(
+      parseInt(vnDateOnly[3], 10),
+      parseInt(vnDateOnly[2], 10) - 1,
+      parseInt(vnDateOnly[1], 10)
+    );
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  const parsed = new Date(trimmed);
+  return isNaN(parsed.getTime()) ? null : parsed;
+}
+
 /**
  * Lấy ngày tháng ghi nhận hiệu lực / ban hành của thủ tục
  */
 export function getProcedureDate(p: Procedure): Date {
-  if (p.ngayBanHanh) {
-    const d = new Date(p.ngayBanHanh);
-    if (!isNaN(d.getTime())) return d;
-  }
+  const banHanh = parseFlexibleDate(p.ngayBanHanh);
+  if (banHanh) return banHanh;
 
-  // Tìm kiếm ngày trong Căn cứ pháp lý (VD: ngày 25/11/2021 hoặc 25-11-2021 hoặc 2026)
+  // Tìm kiếm ngày trong Căn cứ pháp lý (VD: ngày 25/11/2021 hoặc 25-11-2021)
   if (p.canCuPhapLy) {
     const match = p.canCuPhapLy.match(/ngày\s+(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/i);
     if (match) {
@@ -77,15 +104,11 @@ export function getProcedureDate(p: Procedure): Date {
   }
 
   // Fallback sang ngayCapNhat hoặc ngayTao
-  if (p.ngayCapNhat) {
-    const d = new Date(p.ngayCapNhat);
-    if (!isNaN(d.getTime())) return d;
-  }
+  const capNhat = parseFlexibleDate(p.ngayCapNhat);
+  if (capNhat) return capNhat;
 
-  if (p.ngayTao) {
-    const d = new Date(p.ngayTao);
-    if (!isNaN(d.getTime())) return d;
-  }
+  const tao = parseFlexibleDate(p.ngayTao);
+  if (tao) return tao;
 
   return new Date();
 }
@@ -101,10 +124,12 @@ export function getQuarterFromDate(date: Date): number {
  * Lọc thủ tục theo kỳ báo cáo (Tháng, Quý, Năm)
  */
 export interface BienDongFilterOptions {
-  periodType: 'quarter' | 'month' | 'year' | 'all';
+  periodType: 'quarter' | 'month' | 'year' | 'date_range' | 'all';
   quarter: number; // 1, 2, 3, 4
   month: number; // 1 - 12
   year: number; // e.g. 2026
+  fromDate?: string; // YYYY-MM-DD
+  toDate?: string;   // YYYY-MM-DD
   capThucHien?: string;
   linhVuc?: string;
   statusFilter?: 'all' | 'bien_dong' | TrangThaiBienDong; // 'bien_dong' là chỉ lấy SĐBS & Bãi bỏ & Ban hành mới
@@ -114,6 +139,15 @@ export function filterProceduresForReport(
   procedures: Procedure[],
   options: BienDongFilterOptions
 ): Procedure[] {
+  const startDay = options.fromDate ? parseFlexibleDate(options.fromDate) : null;
+  const endDay = options.toDate ? parseFlexibleDate(options.toDate) : null;
+  const startDayMs = startDay
+    ? new Date(startDay.getFullYear(), startDay.getMonth(), startDay.getDate()).getTime()
+    : null;
+  const endDayMs = endDay
+    ? new Date(endDay.getFullYear(), endDay.getMonth(), endDay.getDate()).getTime()
+    : null;
+
   return procedures.filter(p => {
     // 1. Lọc theo trạng thái
     const status = getProcedureTrangThai(p);
@@ -139,6 +173,17 @@ export function filterProceduresForReport(
     if (options.periodType === 'all') return true;
 
     const date = getProcedureDate(p);
+
+    if (options.periodType === 'date_range') {
+      if (startDayMs !== null && endDayMs !== null && startDayMs > endDayMs) {
+        return false;
+      }
+      const procDayMs = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+      if (startDayMs !== null && procDayMs < startDayMs) return false;
+      if (endDayMs !== null && procDayMs > endDayMs) return false;
+      return true;
+    }
+
     const procYear = date.getFullYear();
 
     // Nếu chọn năm cụ thể
@@ -258,6 +303,13 @@ export async function exportBienDongExcelReport({
   workbook.creator = 'Hệ thống Quản lý TTHC & DVC';
   workbook.created = new Date();
 
+  const formatVnDate = (iso?: string) => {
+    if (!iso) return '';
+    const m = iso.trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (m) return `${m[3].padStart(2, '0')}/${m[2].padStart(2, '0')}/${m[1]}`;
+    return iso;
+  };
+
   // Xác định tiêu đề kỳ báo cáo
   let periodText = '';
   if (filterOptions.periodType === 'quarter') {
@@ -266,6 +318,18 @@ export async function exportBienDongExcelReport({
     periodText = `THÁNG ${filterOptions.month} NĂM ${filterOptions.year}`;
   } else if (filterOptions.periodType === 'year') {
     periodText = `NĂM ${filterOptions.year}`;
+  } else if (filterOptions.periodType === 'date_range') {
+    const fromStr = formatVnDate(filterOptions.fromDate);
+    const toStr = formatVnDate(filterOptions.toDate);
+    if (fromStr && toStr) {
+      periodText = `TỪ NGÀY ${fromStr} ĐẾN NGÀY ${toStr}`;
+    } else if (fromStr) {
+      periodText = `TỪ NGÀY ${fromStr}`;
+    } else if (toStr) {
+      periodText = `ĐẾN NGÀY ${toStr}`;
+    } else {
+      periodText = `THEO KHOẢNG NGÀY`;
+    }
   } else {
     periodText = `TOÀN THỜI KỲ (TÍNH ĐẾN ${new Date().toLocaleDateString('vi-VN')})`;
   }
@@ -560,7 +624,10 @@ export async function exportBienDongExcelReport({
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
   });
 
-  const cleanPeriod = periodText.toLowerCase().replace(/\s+/g, '_');
+  const cleanPeriod = periodText
+    .toLowerCase()
+    .replace(/[\/\\:*?"<>|]/g, '-')
+    .replace(/\s+/g, '_');
   const filename = `Bao_cao_tong_hop_bien_dong_TTHC_${cleanPeriod}.xlsx`;
 
   const url = URL.createObjectURL(blob);

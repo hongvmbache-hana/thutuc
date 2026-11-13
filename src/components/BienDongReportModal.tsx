@@ -14,6 +14,7 @@ import {
   FileSpreadsheet,
   Printer,
   Calendar,
+  CalendarRange,
   Layers,
   FileText,
   AlertTriangle,
@@ -55,11 +56,19 @@ export default function BienDongReportModal({
   const currentMonth = now.getMonth() + 1;
   const currentQuarter = Math.floor(now.getMonth() / 3) + 1;
 
+  const formatInputDate = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+  const defaultFromDate = formatInputDate(new Date(currentYear, now.getMonth(), 1));
+  const defaultToDate = formatInputDate(now);
+
   // Filter state
-  const [periodType, setPeriodType] = useState<'quarter' | 'month' | 'year' | 'all'>('quarter');
+  const [periodType, setPeriodType] = useState<'quarter' | 'month' | 'year' | 'date_range' | 'all'>('quarter');
   const [selectedQuarter, setSelectedQuarter] = useState<number>(currentQuarter);
   const [selectedMonth, setSelectedMonth] = useState<number>(currentMonth);
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+  const [fromDate, setFromDate] = useState<string>(defaultFromDate);
+  const [toDate, setToDate] = useState<string>(defaultToDate);
   const [selectedCap, setSelectedCap] = useState<string>('all');
   const [selectedLinhVuc, setSelectedLinhVuc] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'bien_dong' | TrangThaiBienDong>('all');
@@ -69,16 +78,20 @@ export default function BienDongReportModal({
   const [activeTab, setActiveTab] = useState<'detail' | 'summary'>('detail');
   const [isExporting, setIsExporting] = useState<boolean>(false);
 
+  const isInvalidDateRange = periodType === 'date_range' && Boolean(fromDate && toDate && fromDate > toDate);
+
   // Filtered procedures for current period
   const filterOptions: BienDongFilterOptions = useMemo(() => ({
     periodType,
     quarter: selectedQuarter,
     month: selectedMonth,
     year: selectedYear,
+    fromDate,
+    toDate,
     capThucHien: selectedCap,
     linhVuc: selectedLinhVuc,
     statusFilter: statusFilter
-  }), [periodType, selectedQuarter, selectedMonth, selectedYear, selectedCap, selectedLinhVuc, statusFilter]);
+  }), [periodType, selectedQuarter, selectedMonth, selectedYear, fromDate, toDate, selectedCap, selectedLinhVuc, statusFilter]);
 
   // All procedures in this period (without keyword search)
   const periodProcedures = useMemo(() => {
@@ -102,13 +115,27 @@ export default function BienDongReportModal({
     );
   }, [periodProcedures, searchKeyword]);
 
+  const formatDisplayDate = (iso: string) => {
+    const parts = iso.split('-');
+    if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    return iso;
+  };
+
   // Title string based on period
   const periodTitle = useMemo(() => {
     if (periodType === 'quarter') return `Quý ${selectedQuarter} Năm ${selectedYear}`;
     if (periodType === 'month') return `Tháng ${selectedMonth} Năm ${selectedYear}`;
     if (periodType === 'year') return `Cả Năm ${selectedYear}`;
+    if (periodType === 'date_range') {
+      if (fromDate && toDate) {
+        return `Từ ngày ${formatDisplayDate(fromDate)} đến ngày ${formatDisplayDate(toDate)}`;
+      }
+      if (fromDate) return `Từ ngày ${formatDisplayDate(fromDate)}`;
+      if (toDate) return `Đến ngày ${formatDisplayDate(toDate)}`;
+      return 'Theo khoảng ngày';
+    }
     return 'Toàn thời gian';
-  }, [periodType, selectedQuarter, selectedMonth, selectedYear]);
+  }, [periodType, selectedQuarter, selectedMonth, selectedYear, fromDate, toDate]);
 
   // Handle Quick Status Update for a procedure directly in the modal
   const handleQuickStatusChange = (proc: Procedure, newStatus: TrangThaiBienDong) => {
@@ -221,6 +248,18 @@ export default function BienDongReportModal({
               </button>
 
               <button
+                onClick={() => setPeriodType('date_range')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  periodType === 'date_range'
+                    ? 'bg-red-700 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                <CalendarRange className="w-3.5 h-3.5" />
+                Theo khoảng ngày
+              </button>
+
+              <button
                 onClick={() => setPeriodType('year')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                   periodType === 'year'
@@ -247,8 +286,8 @@ export default function BienDongReportModal({
             <div className="flex items-center gap-2">
               <button
                 onClick={handleExportExcel}
-                disabled={isExporting}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                disabled={isExporting || isInvalidDateRange}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 id="export-bien-dong-excel-btn"
               >
                 <FileSpreadsheet className="w-4 h-4" />
@@ -268,25 +307,55 @@ export default function BienDongReportModal({
 
           </div>
 
-          {/* Selectors for Quarter / Month / Year & Filters */}
+          {/* Selectors for Quarter / Month / Year / Date Range & Filters */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5 pt-1">
             
-            {/* Year Selector */}
-            <div className="space-y-1">
-              <label className="text-[11px] font-bold text-slate-500 uppercase">Năm báo cáo</label>
-              <select
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(Number(e.target.value))}
-                className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-red-600"
-              >
-                <option value={2026}>Năm 2026</option>
-                <option value={2025}>Năm 2025</option>
-                <option value={2024}>Năm 2024</option>
-                <option value={2023}>Năm 2023</option>
-                <option value={2022}>Năm 2022</option>
-                <option value={2021}>Năm 2021</option>
-              </select>
-            </div>
+            {/* Year Selector (only when not date_range or all) */}
+            {periodType !== 'date_range' && periodType !== 'all' && (
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-500 uppercase">Năm báo cáo</label>
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(Number(e.target.value))}
+                  className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-red-600"
+                >
+                  <option value={2026}>Năm 2026</option>
+                  <option value={2025}>Năm 2025</option>
+                  <option value={2024}>Năm 2024</option>
+                  <option value={2023}>Năm 2023</option>
+                  <option value={2022}>Năm 2022</option>
+                  <option value={2021}>Năm 2021</option>
+                </select>
+              </div>
+            )}
+
+            {/* Date Range Selectors (if periodType === 'date_range') */}
+            {periodType === 'date_range' && (
+              <>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-500 uppercase">Từ ngày</label>
+                  <input
+                    type="date"
+                    value={fromDate}
+                    max={toDate || undefined}
+                    onChange={(e) => setFromDate(e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-red-600"
+                    id="report-from-date"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-500 uppercase">Đến ngày</label>
+                  <input
+                    type="date"
+                    value={toDate}
+                    min={fromDate || undefined}
+                    onChange={(e) => setToDate(e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-red-600"
+                    id="report-to-date"
+                  />
+                </div>
+              </>
+            )}
 
             {/* Quarter Selector (if periodType === 'quarter') */}
             {periodType === 'quarter' && (
@@ -370,6 +439,66 @@ export default function BienDongReportModal({
             </div>
 
           </div>
+
+          {/* Quick date presets & validation warning for date_range */}
+          {periodType === 'date_range' && (
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] font-semibold text-slate-500 mr-1">Chọn nhanh:</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const t = formatInputDate(now);
+                    setFromDate(t);
+                    setToDate(t);
+                  }}
+                  className="px-2 py-0.5 rounded-md bg-white border border-slate-200 hover:border-red-400 hover:text-red-700 text-[11px] font-semibold text-slate-600 transition-colors cursor-pointer"
+                >
+                  Hôm nay
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const d7 = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+                    setFromDate(formatInputDate(d7));
+                    setToDate(formatInputDate(now));
+                  }}
+                  className="px-2 py-0.5 rounded-md bg-white border border-slate-200 hover:border-red-400 hover:text-red-700 text-[11px] font-semibold text-slate-600 transition-colors cursor-pointer"
+                >
+                  7 ngày qua
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const d30 = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
+                    setFromDate(formatInputDate(d30));
+                    setToDate(formatInputDate(now));
+                  }}
+                  className="px-2 py-0.5 rounded-md bg-white border border-slate-200 hover:border-red-400 hover:text-red-700 text-[11px] font-semibold text-slate-600 transition-colors cursor-pointer"
+                >
+                  30 ngày qua
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+                    setFromDate(formatInputDate(firstOfMonth));
+                    setToDate(formatInputDate(now));
+                  }}
+                  className="px-2 py-0.5 rounded-md bg-white border border-slate-200 hover:border-red-400 hover:text-red-700 text-[11px] font-semibold text-slate-600 transition-colors cursor-pointer"
+                >
+                  Từ đầu tháng
+                </button>
+              </div>
+
+              {isInvalidDateRange && (
+                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-lg">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  <span>Ngày bắt đầu ("Từ ngày") không được lớn hơn ngày kết thúc ("Đến ngày").</span>
+                </div>
+              )}
+            </div>
+          )}
 
         </div>
 
@@ -691,8 +820,8 @@ export default function BienDongReportModal({
           <div className="flex items-center gap-2">
             <button
               onClick={handleExportExcel}
-              disabled={isExporting}
-              className="px-4 py-2 rounded-lg text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              disabled={isExporting || isInvalidDateRange}
+              className="px-4 py-2 rounded-lg text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <FileSpreadsheet className="w-4 h-4" />
               <span>Xuất File Excel</span>
